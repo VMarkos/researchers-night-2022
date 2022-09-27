@@ -14,12 +14,47 @@ let PLAYING = true;
 let EMPTY_CELLS;
 let NO_LEGAL_MOVES = false;
 
-let EXPLANATION = "";
+let EXPLANATION = document.createElement("li");
+EXPLANATION.classList.add("why");
+
+let CONTRASTIVE_EXPLANATION = document.createElement("li");
+CONTRASTIVE_EXPLANATION.classList.add("why");
 
 const TEST_POLICY = `@KnowledgeBase
-Dummy :: legalMove(X, Y) implies move(X, Y);`
+D1 :: legalMove(X,Y) implies move(X,Y);
+D2 :: legalMove(X,Y), legalMove(Z,W), corner(Z,W), -?=(X,Z) implies -move(X,Y);
+D3 :: legalMove(X,Y), legalMove(Z,W), corner(Z,W), -?=(Y,W) implies -move(X,Y);
+C1 :: implies corner(0, 0);
+C2 :: implies corner(0,7);
+C3 :: implies corner(7,0);
+C4 :: implies corner(7,7);
+R1 :: legalMove(X,Y), corner(X,Y) implies move(X,Y);
+R2 :: corner(X,Y), legalMove(Z,W), ?isAdj(X,Y,Z,W) implies -move(Z,W);
 
-const TEST_DICT = {"Dummy": "I chose at random among any legal moves I was allowed to make."};
+@Procedures
+function isAdj(x,y,z,w) {
+    const X = parseInt(x);
+    const Y = parseInt(y);
+    const Z = parseInt(z);
+    const W = parseInt(w);
+    return Z-X < 2 && X-Z < 2 && W-Y < 2 && Y-W < 2 && (X != Z || Y != W);
+}`
+
+const TEST_DICT = {
+    "D1": "Play any legal move available, resolving ties at random.",
+    "D2": "If there is a move to a corner available, then do not play any other move.",
+    "D3": "If there is a move to a corner available, then do not play any other move.",
+    "C1": "Square at (0,0) is a corner square.",
+    "C2": "Square at (0,7) is a corner square.",
+    "C3": "Square at (7,0) is a corner square.",
+    "C4": "Square at (7,7) is a corner square.",
+    "R1": "If there is a legal move to a corner, prefer that move.",
+    "R2": "If there is a legal move next to a corner, avoid that move.",
+};
+
+const TEST_LITERAL_DICT = {
+    "move": (x, y) => {console.log("in:", x, y); return `move to (${x + 1}, ${y + 1})`;},
+};
 
 function initializeBoard() {
     document.getElementById("blacks").innerText = 2;
@@ -252,26 +287,34 @@ function startNewGameDialogue(result) {
 		}
 }
 
-function nextMove(moveFunction=randomMove) {
-	if (!PLAYING) { // Do you really need this?
-        // console.log("Not Playing!");
-        initializeBoard();
-        // console.log("Board populated!");
-		PLAYING = true;
-        document.getElementById("play-button-text").innerHTML = "Next";
-	}
-	const move = moveFunction();
-    // debugger;
-	if (move === 1) {// || EMPTY_CELLS === 0) {
-		PLAYING = false;
-		startNewGameDialogue("Game Over!");
-	}
-}
-
 /* Agents */
 
 function randomMove(color = -1) {
-    EXPLANATION = "I play at random! :)"
+    EXPLANATION.innerHTML = "";
+    CONTRASTIVE_EXPLANATION.innerHTML = "";
+    const explanationsUl = document.createElement("ul");
+    explanationsUl.classList.add("explanations-list");
+    explanationsUl.classList.add("hidden");
+    currentLi = document.createElement("li");
+    currentLi.innerText = "I had no idea about what to do, so I chose a move randomly.";
+    explanationsUl.appendChild(currentLi);
+    const whySpan = document.createElement("span");
+    whySpan.innerHTML = "<b>Why?</b>";
+    whySpan.classList.add("why");
+    whySpan.id = "why-span";
+    whySpan.onmouseup = () => {showSiblings("why-span");};
+    EXPLANATION.appendChild(whySpan);
+    EXPLANATION.appendChild(explanationsUl);
+    const contrastiveUl = document.createElement("ul");
+    contrastiveUl.classList.add("contrastive-explanations-list");
+    contrastiveUl.classList.add("hidden");
+    const whyNotSpan = document.createElement("span");
+    whyNotSpan.innerHTML = "<b>Why not...</b>";
+    whyNotSpan.classList.add("why");
+    whyNotSpan.id = "why-not-span";
+    whyNotSpan.onmouseup = () => {showSiblings("why-not-span");};
+    CONTRASTIVE_EXPLANATION.appendChild(whyNotSpan);
+    CONTRASTIVE_EXPLANATION.appendChild(contrastiveUl);
     if (LEGAL_MOVES.length === 0) {
         return 0;
         // calculateLegalMoves((-1) * color);
@@ -294,12 +337,11 @@ function randomMove(color = -1) {
 }
 
 function makeDoubleMove(row, col, color = -1) {
-    const explainText = document.getElementById("explanation-text");
-    explainText.innerHTML = "";
+    const explanationContainer = document.getElementById("explanation-text");
+    explanationContainer.innerHTML = "";
     makeSingleMove(row, col, color);
     setTimeout(() => {
         const move = prudensMove((-1) * color);
-        console.log(move);
     }, 500);
 }
 
@@ -308,7 +350,8 @@ function reset() {
     board.innerHTML = "";
     const explainText = document.getElementById("explanation-text");
     explainText.innerHTML = "";
-    EXPLANATION = "";
+    EXPLANATION.innerHTML = "";
+    CONTRASTIVE_EXPLANATION.innerHTML = "";
     initializeBoard();
 }
 
@@ -318,7 +361,7 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
     }
 	const outObj = otDeduce();
     const output = outObj["output"];
-    const inferences = outObj["inferences"].split(";").filter(Boolean);
+    const inferences = outObj["inferences"].split(/\s*;\s*/).filter(Boolean);
 	const suggestedMoves = [];
 	console.log("inferences:", inferences);
 	for (const literal of inferences) {
@@ -329,11 +372,12 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
 	}
     // console.log(suggestedMoves);
 	if (suggestedMoves.length === 0) {
-        randomMove();
+        // randomMove();
 		return randomMove(color);
 	}
 	const moveLiteral = suggestedMoves[Math.floor(suggestedMoves.length * Math.random())].trim();
     generateExplanation(moveLiteral, output);
+    generateContrastiveExplanation(moveLiteral, output);
     // console.log("moveLiteral:", moveLiteral);
 	const coords = moveLiteral.substring(5, moveLiteral.length - 1).split(",");
 	const row = coords[0].trim();
@@ -406,15 +450,137 @@ function extractContext() { // Convert an othello board to a Prudens context.
 
 function explain() {
     const explainText = document.getElementById("explanation-text");
-    explainText.innerHTML = EXPLANATION;
+    explainText.innerHTML = "";
+    const explanationUl = document.createElement("ul");
+    // const explanationLi = document.createElement("li");
+    // const contrastiveLi = document.createElement("li");
+    explanationUl.classList.add("explanation");
+    if (EXPLANATION.classList.contains("active")) {
+        EXPLANATION.classList.remove("active");
+    }
+    // contrastiveLi.innerHTML = CONTRASTIVE_EXPLANATION;
+    explanationUl.appendChild(EXPLANATION);
+    explanationUl.appendChild(CONTRASTIVE_EXPLANATION);
+    if (CONTRASTIVE_EXPLANATION.classList.contains("active")) {
+        CONTRASTIVE_EXPLANATION.classList.remove("active");
+    }
+    explainText.appendChild(explanationUl);
+    // explainText.innerHTML = EXPLANATION + "\n" + CONTRASTIVE_EXPLANATION;
 }
 
 function generateExplanation(inference, output) {
+    EXPLANATION.innerHTML = "";
     const graph = output["graph"];
+    // console.log("graph:", graph);
     const crownRules = graph[inference];
-    EXPLANATION = "";
+    let explanations = [], currentExplanation, currentLi;
+    const explanationsUl = document.createElement("ul");
+    explanationsUl.classList.add("explanations-list");
+    explanationsUl.classList.add("hidden");
     for (const rule of crownRules) {
-        EXPLANATION += TEST_DICT[rule["name"]] + "\n";
+        currentExplanation = TEST_DICT[rule["name"]];
+        if (!explanations.includes(currentExplanation)) {
+            // console.log(currentExplanation);
+            currentLi = document.createElement("li");
+            currentLi.innerText = currentExplanation;
+            explanationsUl.appendChild(currentLi);
+        }
+    }
+    const whySpan = document.createElement("span");
+    whySpan.innerHTML = "<b>Why?</b>";
+    whySpan.classList.add("why");
+    whySpan.id = "why-span";
+    whySpan.onmouseup = () => {showSiblings("why-span");};
+    EXPLANATION.appendChild(whySpan);
+    EXPLANATION.appendChild(explanationsUl);
+}
+
+function generateContrastiveExplanation(inference, output) {
+    CONTRASTIVE_EXPLANATION.innerHTML = "";
+    const graph = output["graph"];
+    // const defeatedRules = output["defeatedRules"];
+    // const crownRules = graph[inference];
+    const splitInference = inference.split(/\(|\)/).filter(Boolean);
+    const inferenceName = splitInference[0];
+    // const infArgs = splitInference[1].split(/\s*,\s*/).filter(Boolean);
+    const oppositeInferenceName = (inference[0] === "-" ? "" : "-") + inferenceName;
+    const oppInfLength = oppositeInferenceName.length;
+    const contrastiveUl = document.createElement("ul");
+    contrastiveUl.classList.add("contrastive-explanations-list");
+    contrastiveUl.classList.add("hidden");
+    let splitKey, keyArgs, explanations, currentExplanation, literalLi, literalUl, explanationLi, literalSpan;
+    for (const key of Object.keys(graph)) {
+        if (key.substring(0, oppInfLength) !== oppositeInferenceName) {
+            continue;
+        }
+        splitKey = key.split(/\(|\)/).filter(Boolean);
+        keyArgs = splitKey[1].split(/\s*,\s*/).filter(Boolean);
+        keyArgs = keyArgs.map((x) => {return parseInt(x);});
+        const keyArguments = [...keyArgs];
+        literalLi = document.createElement("li");
+        literalLi.classList.add("literal");
+        literalSpan = document.createElement("span");
+        literalSpan.innerText = TEST_LITERAL_DICT[inferenceName].call(this, ...keyArgs) + "?";
+        literalSpan.classList.add("contrastive-literal");
+        literalSpan.id = key;
+        literalSpan.onmouseup = () => {showSiblings(key);};
+        literalSpan.onmouseover = () => {shadeCell(...keyArguments);};
+        literalSpan.onmouseout = () => {shadeCell(...keyArguments);};
+        literalLi.appendChild(literalSpan);
+        literalUl = document.createElement("ul");
+        literalUl.classList.add("contrastive-explanations");
+        literalUl.classList.add("hidden");
+        explanations = [];
+        for (const rule of graph[key]) {
+            currentExplanation = TEST_DICT[rule["name"]];
+            if (!explanations.includes(currentExplanation)) {
+                explanationLi = document.createElement("li");
+                explanations.push(currentExplanation);
+                explanationLi.innerText = currentExplanation;
+                literalUl.appendChild(explanationLi);
+            }
+        }
+        literalLi.appendChild(literalUl);
+        contrastiveUl.appendChild(literalLi);
+    }
+    const whyNotSpan = document.createElement("span");
+    whyNotSpan.innerHTML = "<b>Why not...</b>";
+    whyNotSpan.classList.add("why");
+    whyNotSpan.id = "why-not-span";
+    whyNotSpan.onmouseup = () => {showSiblings("why-not-span");};
+    CONTRASTIVE_EXPLANATION.appendChild(whyNotSpan);
+    CONTRASTIVE_EXPLANATION.appendChild(contrastiveUl);
+}
+
+function showSiblings(id) {
+    const element = document.getElementById(id);
+    console.log(element.parentElement.parentElement, element.parentElement.parentElement.classList);
+    if (!element.parentElement.classList.contains("active")) {
+        element.parentElement.classList.add("active");
+    } else {
+        element.parentElement.classList.remove("active");
+    }
+    const children = element.parentElement.children;
+    let child;
+    for (let i = 1; i < children.length; i++) {
+        child = children[i];
+        if (child.classList.contains("hidden")) {
+            child.classList.remove("hidden");
+        } else {
+            child.classList.add("hidden");
+        }
+    }
+}
+
+function shadeCell(row, col) {
+    console.log("row:", row, "col:", col);
+    // this.row = row;
+    // this.col = col;
+    const cell = document.getElementById("oc-" + row + "-" + col);
+    if (cell.classList.contains("highlighted")) {
+        cell.classList.remove("highlighted");
+    } else {
+        cell.classList.add("highlighted");
     }
 }
 
@@ -422,6 +588,7 @@ function generateExplanation(inference, output) {
 
 function main() {
     initializeBoard();
+    // console.log(document.getElementById("explanation-p"));
 }
 
 window.addEventListener("load", main);

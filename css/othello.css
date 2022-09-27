@@ -38,12 +38,15 @@ body {
 }
 
 .explanation-text {
+    display: flex;
+    flex-direction: column;
     background-color: rgba(199, 75, 80, 1);
     border-radius: 4px;
     padding: 5px;
     height: 150px;
     overflow-y: auto;
     max-width: inherit;
+    white-space: pre-wrap;
     /* max-height: 150px; */
     border-left: 4px solid white;
     margin-top: 20px;
@@ -80,6 +83,52 @@ body {
 
 .why-button:hover, .reset-button:hover {
     opacity: 0.9;
+}
+
+span.why, span.contrastive-literal {
+    padding: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+span.why:hover, span.contrastive-literal:hover {
+    background-color: rgba(0, 0, 0, .3);
+}
+
+.hidden {
+    display: none;
+}
+
+ul.explanation {
+    list-style-type: "\2B9E";
+    padding-left: 12px;
+    margin-top: 0px;
+}
+
+li.active {
+    list-style-type: "\2B9F";
+}
+
+ul.explanations-list {
+    list-style-type: disc;
+    margin-top: 10px;
+}
+
+ul.contrastive-explanations-list {
+    list-style-type: "\2B9E";
+    margin-top: 10px;
+}
+
+ul.contrastive-explanations {
+    list-style-type: square;
+}
+
+li.why + li.why {
+    margin-top: 10px;
+}
+
+li.literal + li.literal {
+    margin-top: 10px;
 }
 
 /* Othello */
@@ -133,6 +182,10 @@ body {
     width: 50px;
     height: 50px;
     position: relative;
+}
+
+.highlighted {
+    background-color: rgba(199, 75, 80, 1);
 }
 
 .othello-piece-white {

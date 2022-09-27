@@ -577,6 +577,16 @@ function updateGraph(inferredHead, newRule, graph, previousFacts, factsToBeAdded
             // console.log("lit:", oppositeHead);
             // debugger;
             beatsAll = true; // FIXME in case an ungrounded variable appears on the head (i.e., one that *DOES NOT* appear in the rule's body, it should through a runtime error --- or, better, catch this on parsing?)
+            // console.log("graph (in FC):", graph);
+            // console.log("oppositeHead:", oppositeHead);
+            // console.log("oppositeHead (string):", literalToString(oppositeHead));
+            // console.log("newRule:", newRule);
+            // console.log("newRule (string):", ruleToString(newRule));
+            // console.log("inferredHead:", inferredHead);
+            // console.log("inferredHead (string):", literalToString(inferredHead));
+            if (!Object.keys(graph).includes(literalToString(oppositeHead))) { // FIXME You need to make the code more readable here!
+                continue;
+            }
             for (const rule of graph[literalToString(oppositeHead)]) {
 				isPrior = priorityFunction(newRule, rule, kbObject, sub);
                 // console.log(newRule, rule);
