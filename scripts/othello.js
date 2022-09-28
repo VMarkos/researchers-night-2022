@@ -53,7 +53,7 @@ const TEST_DICT = {
 };
 
 const TEST_LITERAL_DICT = {
-    "move": (x, y) => {console.log("in:", x, y); return `move to (${x + 1}, ${y + 1})`;},
+    "move": (x, y) => {return `move to (${x + 1}, ${y + 1})`;},
 };
 
 function initializeBoard() {
@@ -111,7 +111,7 @@ function eraseLegalMoves() {
 function flipPieces() {
     let coords, currentPiece, row, col;
     // console.log("TO_BE_FLIPPED:", TO_BE_FLIPPED);
-    console.log("LAST_MOVE:", LAST_MOVE);
+    // console.log("LAST_MOVE:", LAST_MOVE);
     for (const cellId of TO_BE_FLIPPED[LAST_MOVE]) {
         currentPiece = document.getElementById(cellId).lastChild;
         // console.log("cellId:", cellId);
@@ -186,6 +186,9 @@ function calculateLegalMoves(opponent = 1) {
             }
         }
     }
+    if (LEGAL_MOVES.length === 0 && opponent === 1) {
+        calculateLegalMoves((-1) * opponent);
+    }
 }
 
 function isLegalMoveInDirection(cellId, xStep, yStep, opponent = 1) {
@@ -235,6 +238,17 @@ function makeSingleMove(row, col, color = -1) {
     flipPieces();
     updateScore(color);
     calculateLegalMoves(color);
+    // if (LEGAL_MOVES.length === 0 && color === 1) {
+    //     console.log("You have no move!", LEGAL_MOVES);
+    //     calculateLegalMoves((-1) * color);
+    //     console.log("Opponent moves!", LEGAL_MOVES);
+    //     debugger;
+    //     const prMove = prudensMove(color);
+    //     if (prMove === 0) {
+    //         LEGAL_MOVES = [];
+    //         console.log("The End!");
+    //     }
+    // }
     drawLegalMoves();
     EMPTY_CELLS -= 1;
 }
@@ -271,7 +285,7 @@ function updateLastMove(cellId) {
 }
 
 function isGameOver() {
-    console.log("EMPTY_CELLS:", EMPTY_CELLS);
+    // console.log("EMPTY_CELLS:", EMPTY_CELLS);
     return EMPTY_CELLS === 0;
 }
 
@@ -339,10 +353,30 @@ function randomMove(color = -1) {
 function makeDoubleMove(row, col, color = -1) {
     const explanationContainer = document.getElementById("explanation-text");
     explanationContainer.innerHTML = "";
-    makeSingleMove(row, col, color);
-    setTimeout(() => {
-        const move = prudensMove((-1) * color);
-    }, 500);
+    let gameOverCounter = 0;
+    if (LEGAL_MOVES.length > 0) {
+        makeSingleMove(row, col, color);
+    } else {
+        // console.log("NO LEGAL MOVES (human)");
+        calculateLegalMoves((-1) * color);
+        drawLegalMoves();
+        gameOverCounter++;
+    }
+    if (LEGAL_MOVES.length > 0) {
+        setTimeout(() => {
+            const move = prudensMove((-1) * color);
+        }, 500);
+    } else {
+        // console.log("NO LEGAL MOVES (Prudens)");
+        calculateLegalMoves((-1) * color);
+        drawLegalMoves();
+        gameOverCounter++;
+    }
+    if (gameOverCounter === 2) {
+        return;
+    } else {
+        gameOverCounter = 0;
+    }
 }
 
 function reset() {
@@ -363,7 +397,7 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
     const output = outObj["output"];
     const inferences = outObj["inferences"].split(/\s*;\s*/).filter(Boolean);
 	const suggestedMoves = [];
-	console.log("inferences:", inferences);
+	// console.log("inferences:", inferences);
 	for (const literal of inferences) {
         // console.log(literal.trim().substring(0, 5));
 		if (literal.trim().substring(0, 5) === "move(") {
@@ -407,7 +441,7 @@ function otDeduce() {
   if (contextObject["type"] === "error") {
       return "ERROR: " + contextObject["name"] + ":\n" + contextObject["message"];
   }
-  console.log(contextObject); // TODO fix some context parsing issue (in propositional cases it includes the semicolon into the name of the prop)
+//   console.log(contextObject); // TODO fix some context parsing issue (in propositional cases it includes the semicolon into the name of the prop)
   const output = forwardChaining(kbObject, contextObject["context"]);
   const inferences = output["facts"];
   // console.log(graph);
@@ -554,7 +588,7 @@ function generateContrastiveExplanation(inference, output) {
 
 function showSiblings(id) {
     const element = document.getElementById(id);
-    console.log(element.parentElement.parentElement, element.parentElement.parentElement.classList);
+    // console.log(element.parentElement.parentElement, element.parentElement.parentElement.classList);
     if (!element.parentElement.classList.contains("active")) {
         element.parentElement.classList.add("active");
     } else {
@@ -573,7 +607,7 @@ function showSiblings(id) {
 }
 
 function shadeCell(row, col) {
-    console.log("row:", row, "col:", col);
+    // console.log("row:", row, "col:", col);
     // this.row = row;
     // this.col = col;
     const cell = document.getElementById("oc-" + row + "-" + col);
