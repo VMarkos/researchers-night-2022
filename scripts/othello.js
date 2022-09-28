@@ -80,7 +80,7 @@ function initializeBoard() {
     drawLegalMoves();
 }
 
-function drawLegalMoves() {
+function drawLegalMoves(color = -1) {
     let cellContainer, legalMove, coords, row, col;
     for (const cellId of LEGAL_MOVES) {
         // console.log(cellId);
@@ -88,12 +88,16 @@ function drawLegalMoves() {
         cellContainer = document.getElementById(cellId);
         legalMove = document.createElement("div");
         legalMove.classList.add("legal-moves-black");
-        legalMove.addEventListener("mouseup", () => {
-            coords = cellId.split("-");
-            row = parseInt(coords[1]);
-            col = parseInt(coords[2]);
-            makeDoubleMove(row, col);
-        });
+        if (color === -1) {
+            legalMove.addEventListener("mouseup", () => {
+                coords = cellId.split("-");
+                row = parseInt(coords[1]);
+                col = parseInt(coords[2]);
+                makeDoubleMove(row, col);
+            });
+        } else {
+            legalMove.style.cursor = "auto";
+        }
         cellContainer.append(legalMove);
     }
 }
@@ -249,7 +253,7 @@ function makeSingleMove(row, col, color = -1) {
     //         console.log("The End!");
     //     }
     // }
-    drawLegalMoves();
+    drawLegalMoves((-1) * color);
     EMPTY_CELLS -= 1;
 }
 
@@ -358,8 +362,8 @@ function makeDoubleMove(row, col, color = -1) {
         makeSingleMove(row, col, color);
     } else {
         // console.log("NO LEGAL MOVES (human)");
-        calculateLegalMoves((-1) * color);
-        drawLegalMoves();
+        calculateLegalMoves(color);
+        drawLegalMoves((-1) * color);
         gameOverCounter++;
     }
     if (LEGAL_MOVES.length > 0) {
@@ -369,7 +373,7 @@ function makeDoubleMove(row, col, color = -1) {
     } else {
         // console.log("NO LEGAL MOVES (Prudens)");
         calculateLegalMoves((-1) * color);
-        drawLegalMoves();
+        drawLegalMoves(color);
         gameOverCounter++;
     }
     if (gameOverCounter === 2) {
