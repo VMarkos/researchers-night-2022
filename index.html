@@ -16,14 +16,15 @@
         <script type="text/javascript" src="./prudens_web/prudens.js"></script>
         <script type="text/javascript" src="./prudens_web/prudensUtils.js"></script>
         <script type="text/javascript" src="./scripts/othello.js"></script>
+        <script type="text/javascript" src="./scripts/tour.js"></script>
         <title>
-            Prudens
+            Prudens &mdash; Othello
         </title>
     </head>
     <body>
-        <div class="center-board-container">
-            <div class="game-container">
-                <div class="othello-score-board-container">
+        <div id="body-container" class="center-board-container">
+            <div id="game-container" class="game-container">
+                <div id="score-board" class="othello-score-board-container">
                     <div class="othello-point-container">
                         <div class="othello-point-color black"></div>
                         <div id="blacks" class="othello-score-text-container">2</div>
@@ -38,14 +39,17 @@
                 </div>
             </div>
             <div class="explanation-container">
-                <div class="buttons-container">
+                <div id="buttons-container" class="buttons-container">
                     <div class="why-button", onclick="explain()">Why?</div>
                     <div class="reset-button", onclick="reset()">Reset</div>
                 </div>
                 <div id="explanation-text" class="explanation-text">
 
                 </div>
-                <div class="footer-container">
+                <div id="info-container" class="footer-container">
+                    <div class="tour-container" onclick="startTour()">
+                        Take a Tour!
+                    </div>
                     <div class="help-container">
                         <a href="https://www.eothello.com/#how-to-play"><i class="fa fa-info-circle fa-2x"></i></a>
                     </div>
