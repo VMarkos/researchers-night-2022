@@ -29,6 +29,7 @@ body {
     background-color: rgba(55, 75, 80, 1.0);
     color: white;
     box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.7);
+    transition-duration: 200ms;
 }
 
 @media (min-width: 1200px) {
@@ -318,6 +319,7 @@ li.literal + li.literal {
 
 .tour-dialog.spacing {
     margin-bottom: 40px;
+    margin-top: 20px;
 }
 
 .tour-next-button {
@@ -347,4 +349,15 @@ li.literal + li.literal {
     z-index: 3;
     width: 100%;
     height: 100%;
+}
+
+/* Animation */
+
+.translate-board-down {
+    transform: translateY(150px);
+}
+
+.translate-board-up {
+    transition-duration: 0ms;
+    transform: translateY(20px);
 }

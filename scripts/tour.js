@@ -21,6 +21,7 @@ function initializeTour() {
     blocker.id = "blocker";
     blocker.classList.add("blocker");
     gameContainer.appendChild(blocker);
+    gameContainer.classList.add("translate-board-down");
     document.getElementById("fader").remove();
     const tourDialog = document.createElement("div");
     tourDialog.id = "tour-dialog";
@@ -33,8 +34,11 @@ function initializeTour() {
     tourButton.innerText = "Next";
     tourButton.onclick = scoreDialog;
     tourDialog.appendChild(tourButton);
-    document.body.prepend(tourDialog);
-    highlightLegalMoves();
+    setTimeout(() => {
+        gameContainer.classList.add("translate-board-up");
+        document.body.prepend(tourDialog);
+        highlightLegalMoves();
+    }, 200);
 }
 
 function highlightLegalMoves() {
@@ -118,6 +122,9 @@ function highlightInfo() {
 }
 
 function endTour() {
+    const gameContainer = document.getElementById("body-container");
+    gameContainer.classList.remove("translate-board-up");
+    gameContainer.classList.remove("translate-board-down");
     highlightInfo();
     document.getElementById("tour-dialog").remove();
     const blocker = document.getElementById("blocker");
