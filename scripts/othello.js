@@ -14,31 +14,14 @@ let PLAYING = true;
 let EMPTY_CELLS;
 let NO_LEGAL_MOVES = false;
 
-let EXPLANATION = document.createElement("li");
-EXPLANATION.classList.add("why");
+let EXPLANATION = {};
 
-let CONTRASTIVE_EXPLANATION = document.createElement("li");
-CONTRASTIVE_EXPLANATION.classList.add("why");
+let EXPLANATION_BORDERS = [];
 
-const TEST_POLICY = `@KnowledgeBase
-D1 :: legalMove(X,Y) implies move(X,Y);
-D2 :: legalMove(X,Y), legalMove(Z,W), corner(Z,W), -?=(X,Z) implies -move(X,Y);
-D3 :: legalMove(X,Y), legalMove(Z,W), corner(Z,W), -?=(Y,W) implies -move(X,Y);
-C1 :: implies corner(0, 0);
-C2 :: implies corner(0,7);
-C3 :: implies corner(7,0);
-C4 :: implies corner(7,7);
-R1 :: legalMove(X,Y), corner(X,Y) implies move(X,Y);
-R2 :: corner(X,Y), legalMove(Z,W), ?isAdj(X,Y,Z,W) implies -move(Z,W);
+// TEST_POLICY = `@Knowledge
+// RME :: legalMove(X,Y), cell(X+1,Y,-1), cell(X+2,Y,1) implies move(X,Y);`
 
-@Procedures
-function isAdj(x,y,z,w) {
-    const X = parseInt(x);
-    const Y = parseInt(y);
-    const Z = parseInt(z);
-    const W = parseInt(w);
-    return Z-X < 2 && X-Z < 2 && W-Y < 2 && Y-W < 2 && (X != Z || Y != W);
-}`
+let TEST_POLICY = "";
 
 const TEST_DICT = {
     "D1": "Play any legal move available, resolving ties at random.",
@@ -61,22 +44,30 @@ function initializeBoard() {
     document.getElementById("whites").innerText = 2;
     EMPTY_CELLS = N_ROWS * N_COLS - 4;
     const boardContainer = document.getElementById("board-container");
-    let othelloCell;
-    boardContainer.style.gridTemplateColumns = "repeat(" + N_COLS + ", 1fr)";
+    let othelloCell, borderCell;
+    boardContainer.style.gridTemplateColumns = "repeat(" + (N_COLS + 2) + ", 1fr)";
     BOARD = new Array(N_ROWS);
-    for (let i=0; i < N_ROWS; i++) {
-        BOARD[i] = [];
-        for (let j=0; j < N_COLS; j++) {
-            BOARD[i].push(0);
-            othelloCell = document.createElement("div");
-            othelloCell.classList.add("othello-cell");
-            othelloCell.id = "oc-" + i + "-" + j;
-            boardContainer.append(othelloCell);
+    for (let i = -1; i < N_ROWS + 1; i++) {
+        if (i > -1 && i < N_ROWS) {
+            BOARD[i] = [];
+        }
+        for (let j = -1; j < N_COLS + 1; j++) {
+            if (i < 0 || j < 0 || i === N_ROWS || j === N_COLS) {
+                borderCell = document.createElement("div");
+                borderCell.classList.add("border-cell");
+                borderCell.id = "bc|" + i + "|" + j;
+                boardContainer.append(borderCell);
+            } else {
+                BOARD[i].push(0);
+                othelloCell = document.createElement("div");
+                othelloCell.classList.add("othello-cell");
+                othelloCell.id = "oc-" + i + "-" + j;
+                boardContainer.append(othelloCell);
+            }
         }
     }
     setUpPosition(boardContainer);
     calculateLegalMoves();
-    // debugger;
     drawLegalMoves();
 }
 
@@ -90,6 +81,8 @@ function drawLegalMoves(color = -1) {
         legalMove.classList.add("legal-moves-black");
         if (color === -1) {
             legalMove.addEventListener("mouseup", () => {
+                removeExplanationBorders();
+                // console.log("Removed");
                 coords = cellId.split("-");
                 row = parseInt(coords[1]);
                 col = parseInt(coords[2]);
@@ -112,12 +105,23 @@ function eraseLegalMoves() {
     }
 }
 
-function flipPieces() {
+function flipPieces(cellIds = undefined) {
+    // if (TO_BE_FLIPPED[LAST_MOVE] === undefined) {
+    //     return;
+    // }
     let coords, currentPiece, row, col;
     // console.log("TO_BE_FLIPPED:", TO_BE_FLIPPED);
     // console.log("LAST_MOVE:", LAST_MOVE);
-    for (const cellId of TO_BE_FLIPPED[LAST_MOVE]) {
-        currentPiece = document.getElementById(cellId).lastChild;
+    if (cellIds === undefined) {
+        cellIds = TO_BE_FLIPPED[LAST_MOVE];
+    }
+    if (cellIds === undefined) {
+        return;
+    }
+    // console.log("inFlip:", cellIds);
+    for (const cellId of cellIds) {
+        // currentPiece = document.getElementById(cellId).lastChild;
+        currentPiece = document.getElementById(cellId).firstChild;
         // console.log("cellId:", cellId);
         coords = cellId.split("-");
         row = coords[1];
@@ -254,6 +258,12 @@ function makeSingleMove(row, col, color = -1) {
     //     }
     // }
     drawLegalMoves((-1) * color);
+    // if (LEGAL_MOVES.length > 0) {
+    //     drawLegalMoves((-1) * color);
+    // } else {
+    //     calculateLegalMoves((-1) * color);
+    //     drawLegalMoves(color);
+    // }
     EMPTY_CELLS -= 1;
 }
 
@@ -308,8 +318,8 @@ function startNewGameDialogue(result) {
 /* Agents */
 
 function randomMove(color = -1) {
-    EXPLANATION.innerHTML = "";
-    CONTRASTIVE_EXPLANATION.innerHTML = "";
+    // EXPLANATION.innerHTML = "";
+    // CONTRASTIVE_EXPLANATION.innerHTML = "";
     const explanationsUl = document.createElement("ul");
     explanationsUl.classList.add("explanations-list");
     explanationsUl.classList.add("hidden");
@@ -321,8 +331,8 @@ function randomMove(color = -1) {
     whySpan.classList.add("why");
     whySpan.id = "why-span";
     whySpan.onmouseup = () => {showSiblings("why-span");};
-    EXPLANATION.appendChild(whySpan);
-    EXPLANATION.appendChild(explanationsUl);
+    // EXPLANATION.appendChild(whySpan);
+    // EXPLANATION.appendChild(explanationsUl);
     const contrastiveUl = document.createElement("ul");
     contrastiveUl.classList.add("contrastive-explanations-list");
     contrastiveUl.classList.add("hidden");
@@ -331,8 +341,8 @@ function randomMove(color = -1) {
     whyNotSpan.classList.add("why");
     whyNotSpan.id = "why-not-span";
     whyNotSpan.onmouseup = () => {showSiblings("why-not-span");};
-    CONTRASTIVE_EXPLANATION.appendChild(whyNotSpan);
-    CONTRASTIVE_EXPLANATION.appendChild(contrastiveUl);
+    // CONTRASTIVE_EXPLANATION.appendChild(whyNotSpan);
+    // CONTRASTIVE_EXPLANATION.appendChild(contrastiveUl);
     if (LEGAL_MOVES.length === 0) {
         return 0;
         // calculateLegalMoves((-1) * color);
@@ -360,16 +370,21 @@ function makeDoubleMove(row, col, color = -1) {
     let gameOverCounter = 0;
     if (LEGAL_MOVES.length > 0) {
         makeSingleMove(row, col, color);
+        gameOverCounter = 0;
     } else {
         // console.log("NO LEGAL MOVES (human)");
         calculateLegalMoves(color);
         drawLegalMoves((-1) * color);
         gameOverCounter++;
     }
+    if (gameOverCounter === 2) {
+        return;
+    }
     if (LEGAL_MOVES.length > 0) {
         setTimeout(() => {
             const move = prudensMove((-1) * color);
         }, 500);
+        gameOverCounter = 0;
     } else {
         // console.log("NO LEGAL MOVES (Prudens)");
         calculateLegalMoves((-1) * color);
@@ -378,18 +393,19 @@ function makeDoubleMove(row, col, color = -1) {
     }
     if (gameOverCounter === 2) {
         return;
-    } else {
-        gameOverCounter = 0;
     }
 }
 
 function reset() {
     const board = document.getElementById("board-container");
     board.innerHTML = "";
-    const explainText = document.getElementById("explanation-text");
-    explainText.innerHTML = "";
-    EXPLANATION.innerHTML = "";
-    CONTRASTIVE_EXPLANATION.innerHTML = "";
+    EXPLANATION = {}; // Is this needed?
+    downloadPolicy();
+    coachedPolicyString = "";
+    // const explainText = document.getElementById("explanation-text");
+    // explainText.innerHTML = "";
+    // EXPLANATION.innerHTML = "";
+    // CONTRASTIVE_EXPLANATION.innerHTML = "";
     initializeBoard();
 }
 
@@ -399,6 +415,9 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
     }
 	const outObj = otDeduce();
     const output = outObj["output"];
+    if (!output) {
+        return randomMove(color);
+    }
     const inferences = outObj["inferences"].split(/\s*;\s*/).filter(Boolean);
 	const suggestedMoves = [];
 	// console.log("inferences:", inferences);
@@ -413,15 +432,21 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
         // randomMove();
 		return randomMove(color);
 	}
-	const moveLiteral = suggestedMoves[Math.floor(suggestedMoves.length * Math.random())].trim();
+	// const moveLiteral = suggestedMoves[Math.floor(suggestedMoves.length * Math.random())].trim();
+    const moveLiteral = suggestedMoves.pop().trim();
     generateExplanation(moveLiteral, output);
-    generateContrastiveExplanation(moveLiteral, output);
+    // generateContrastiveExplanation(moveLiteral, output);
     // console.log("moveLiteral:", moveLiteral);
 	const coords = moveLiteral.substring(5, moveLiteral.length - 1).split(",");
 	const row = coords[0].trim();
 	const col = coords[1].trim();
 	const cellId = "oc-" + row + "-" + col;
 	updateLastMove(cellId);
+    if (TO_BE_FLIPPED[LAST_MOVE] === undefined) {
+        EXPLANATION.flipped = [];
+    } else {
+        EXPLANATION.flipped = [...TO_BE_FLIPPED[LAST_MOVE]];
+    }
 	if (!LEGAL_MOVES.includes(cellId)) { // Need to throw exception at this point.
         // console.log("Not legal:", LEGAL_MOVES, cellId);
 		return -1;
@@ -487,50 +512,72 @@ function extractContext() { // Convert an othello board to a Prudens context.
 /* Explanations */
 
 function explain() {
-    const explainText = document.getElementById("explanation-text");
-    explainText.innerHTML = "";
-    const explanationUl = document.createElement("ul");
-    // const explanationLi = document.createElement("li");
-    // const contrastiveLi = document.createElement("li");
-    explanationUl.classList.add("explanation");
-    if (EXPLANATION.classList.contains("active")) {
-        EXPLANATION.classList.remove("active");
+    let cellId, bodyCell, bodyBorder;
+    // console.log(EXPLANATION.flipped);
+    if (!alreadyFlipped) {
+        flipPieces(EXPLANATION["flipped"]);
+        alreadyFlipped = true;
     }
-    // contrastiveLi.innerHTML = CONTRASTIVE_EXPLANATION;
-    explanationUl.appendChild(EXPLANATION);
-    explanationUl.appendChild(CONTRASTIVE_EXPLANATION);
-    if (CONTRASTIVE_EXPLANATION.classList.contains("active")) {
-        CONTRASTIVE_EXPLANATION.classList.remove("active");
+    for (const cell of EXPLANATION.body) {
+        if (cell[0] < 0 || cell[1] < 0 || cell[0] === N_ROWS || cell[1] === N_COLS) {
+            cellId = "bc|" + cell[0] + "|" + cell[1];
+        } else {
+            cellId = "oc-" + cell[0] + "-" + cell[1];
+        }
+        EXPLANATION_BORDERS.push(cellId);
+        bodyCell = document.getElementById(cellId);
+        bodyBorder = document.createElement("div");
+        bodyBorder.id = "bb-" + cell[0] + "-" + cell[1];
+        bodyBorder.classList.add("body-cell-explanation");
+        bodyCell.append(bodyBorder);
     }
-    explainText.appendChild(explanationUl);
-    // explainText.innerHTML = EXPLANATION + "\n" + CONTRASTIVE_EXPLANATION;
+    cellId = "oc-" + EXPLANATION.head[0] + "-" + EXPLANATION.head[1];
+    EXPLANATION_BORDERS.push(cellId);
+    bodyCell = document.getElementById(cellId);
+    bodyBorder = document.createElement("div");
+    bodyBorder.id = "bb-" + EXPLANATION.head[0] + "-" + EXPLANATION.head[1];
+    bodyBorder.classList.add("head-cell-explanation");
+    bodyCell.append(bodyBorder);
 }
 
 function generateExplanation(inference, output) {
-    EXPLANATION.innerHTML = "";
+    // console.log("genExp:", output);
+    const splitInf = inference.split(",");
+    const row = parseInt(splitInf[0][splitInf[0].length - 1]);
+    const col = parseInt(splitInf[1].trim()[0]);
+    EXPLANATION = {body: [], head: [row, col]};
+    // console.log("flipped:", flippedPieces);
     const graph = output["graph"];
-    // console.log("graph:", graph);
     const crownRules = graph[inference];
-    let explanations = [], currentExplanation, currentLi;
-    const explanationsUl = document.createElement("ul");
-    explanationsUl.classList.add("explanations-list");
-    explanationsUl.classList.add("hidden");
-    for (const rule of crownRules) {
-        currentExplanation = TEST_DICT[rule["name"]];
-        if (!explanations.includes(currentExplanation)) {
-            // console.log(currentExplanation);
-            currentLi = document.createElement("li");
-            currentLi.innerText = currentExplanation;
-            explanationsUl.appendChild(currentLi);
-        }
+    const rule = crownRules.pop();
+    const ruleName = rule.name;
+    // const ruleTransforms = RULE_MAP.get(ruleName);
+    const rulePoints = RULE_MAP_JSON[ruleName];
+    // console.log("rt:", ruleTransforms);
+    for (const point of rulePoints) {
+        EXPLANATION.body.push([point[0] + row, point[1] + col]);
     }
-    const whySpan = document.createElement("span");
-    whySpan.innerHTML = "<b>Why?</b>";
-    whySpan.classList.add("why");
-    whySpan.id = "why-span";
-    whySpan.onmouseup = () => {showSiblings("why-span");};
-    EXPLANATION.appendChild(whySpan);
-    EXPLANATION.appendChild(explanationsUl);
+    // console.log(EXPLANATION);
+}
+
+function removeExplanationBorders() {
+    let cellSplit, coords, borderCell;
+    for (const cellId of EXPLANATION_BORDERS) {
+        if (cellId[0] === "b") {
+            cellSplit = cellId.split("|");
+        } else {
+            cellSplit = cellId.split("-");
+        }
+        coords = [parseInt(cellSplit[1]), parseInt(cellSplit[2])];
+        borderCell = document.getElementById("bb-" + coords[0] + "-" + coords[1]);
+        document.getElementById(cellId).removeChild(borderCell);
+    }
+    EXPLANATION_BORDERS = [];
+    // console.log("removing:", EXPLANATION["flipped"]);
+    if (alreadyFlipped) {
+        flipPieces(EXPLANATION["flipped"]);
+        alreadyFlipped = false;
+    }
 }
 
 function generateContrastiveExplanation(inference, output) {
@@ -626,7 +673,17 @@ function shadeCell(row, col) {
 
 function main() {
     initializeBoard();
-    // console.log(document.getElementById("explanation-p"));
+    const policyFileInput = document.getElementById("policy-file");
+    const gameFileInput = document.getElementById("game-file");
+    const policyButton = document.getElementById("policy-button");
+    const gameButton = document.getElementById("game-button");
+    policyFileInput.addEventListener("change", uploadPolicy, false);
+    policyButton.addEventListener("click", (e) => {
+        policyFileInput.click();
+    });
+    gameButton.addEventListener("click", (e) => {
+        gameFileInput.click();
+    });
 }
 
 window.addEventListener("load", main);
