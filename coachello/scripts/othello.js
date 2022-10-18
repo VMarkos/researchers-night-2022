@@ -120,7 +120,8 @@ function flipPieces(cellIds = undefined) {
     }
     // console.log("inFlip:", cellIds);
     for (const cellId of cellIds) {
-        currentPiece = document.getElementById(cellId).lastChild;
+        // currentPiece = document.getElementById(cellId).lastChild;
+        currentPiece = document.getElementById(cellId).firstChild;
         // console.log("cellId:", cellId);
         coords = cellId.split("-");
         row = coords[1];
@@ -398,9 +399,12 @@ function makeDoubleMove(row, col, color = -1) {
 function reset() {
     const board = document.getElementById("board-container");
     board.innerHTML = "";
-    const explainText = document.getElementById("explanation-text");
-    explainText.innerHTML = "";
-    EXPLANATION.innerHTML = "";
+    EXPLANATION = {}; // Is this needed?
+    downloadPolicy();
+    coachedPolicyString = "";
+    // const explainText = document.getElementById("explanation-text");
+    // explainText.innerHTML = "";
+    // EXPLANATION.innerHTML = "";
     // CONTRASTIVE_EXPLANATION.innerHTML = "";
     initializeBoard();
 }
@@ -510,7 +514,10 @@ function extractContext() { // Convert an othello board to a Prudens context.
 function explain() {
     let cellId, bodyCell, bodyBorder;
     // console.log(EXPLANATION.flipped);
-    flipPieces(EXPLANATION["flipped"]);
+    if (!alreadyFlipped) {
+        flipPieces(EXPLANATION["flipped"]);
+        alreadyFlipped = true;
+    }
     for (const cell of EXPLANATION.body) {
         if (cell[0] < 0 || cell[1] < 0 || cell[0] === N_ROWS || cell[1] === N_COLS) {
             cellId = "bc|" + cell[0] + "|" + cell[1];
@@ -567,7 +574,10 @@ function removeExplanationBorders() {
     }
     EXPLANATION_BORDERS = [];
     // console.log("removing:", EXPLANATION["flipped"]);
-    flipPieces(EXPLANATION["flipped"]);
+    if (alreadyFlipped) {
+        flipPieces(EXPLANATION["flipped"]);
+        alreadyFlipped = false;
+    }
 }
 
 function generateContrastiveExplanation(inference, output) {

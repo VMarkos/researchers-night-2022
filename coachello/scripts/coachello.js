@@ -1,9 +1,32 @@
-const PATTERN = new Array(N_ROWS); // 0 empty, 1 red (body), 2 blue (head).
+const PATTERN = new Array(N_ROWS + 1); // 0 empty, 1 red (body), 2 blue (positive head), 3 bordeaux? (negative head).
+const PATTERN_SEMANTICS = new Array(N_ROWS + 1);
 let RULE_MAP = new Map();
 let RULE_MAP_JSON = {};
 let basePatterns = [];
 let existsHead = false;
 let N_RULES = 0;
+
+let pRow, pCol;
+
+const LABELS = {
+    border: {
+        labels: ["...a border cell.", "...just an empty cell.", "...this border cell", "...this empty cell."],
+        heading: "Consider this cell as...",
+        defaultIndex: 0,
+    },
+    empty: {
+        labels: ["...just an empty cell.", "...an empty cell with a legal move.", "...this empty cell.", "...this empty cell with a legal move."],
+        heading: "Consider thic cell as...",
+        defaultIndex: 0,
+    },
+    occupied: {
+        labels: ["...only stone color."],
+        heading: "Take into account...",
+        defaultIndex: 0,
+    }
+};
+
+let alreadyFlipped = false;
 
 let coachedPolicyString = "";
 
@@ -20,9 +43,11 @@ const D4 = [ // Dihedral group (n=4). Contains the 7 non-trivial transforms of D
 function initPattern() {
     existsHead = false;
     for (let i = -1; i < N_ROWS + 1; i++) {
-        PATTERN[i] = new Array(N_COLS);
+        PATTERN[i] = new Array(N_COLS + 1);
+        PATTERN_SEMANTICS[i] = new Array(N_COLS + 1);
         for (let j = -1; j < N_COLS + 1; j++) {
             PATTERN[i][j] = 0;
+            PATTERN_SEMANTICS[i][j] = 0;
         }
     }
 }
@@ -38,6 +63,10 @@ function addPattern() {
     const bodyContainer  = document.getElementById("body-container");
     bodyContainer.append(blocker);
     addPatternCells();
+    console.log(EXPLANATION);
+    if (EXPLANATION["flipped"] && !alreadyFlipped) {
+        flipPieces(EXPLANATION["flipped"]);
+    }
 }
 
 function highlightCell(event) {
@@ -64,41 +93,53 @@ function highlightCell(event) {
     } else if (PATTERN[row][col] === 1) {
         PATTERN[row][col] = 0;
         backgroundCell.classList.remove("body-cell");
+    } else if (PATTERN[row][col] === 2) {
+        PATTERN[row][col] = 3;
+        backgroundCell.classList.remove("head-cell");
+        backgroundCell.classList.add("negative-head-cell");
     } else {
         PATTERN[row][col] = 0;
-        backgroundCell.classList.remove("head-cell");
+        backgroundCell.classList.remove("negative-head-cell");
         existsHead = false;
     }
 }
 
 /* 
 BASE PATTERN = {
-    body: [[i, j, 0|1|-1], ...],
-    head [x, y, 1|-1],
+    body: [[i, j, 0|1|-1|-2, 0|1|...], ...], // 0 = default, 1,2,3... = as in LABELS.
+    head: [x, y, 1|-1], // 0 = default, 1,2,3... = as in LABELS.
 };
 */
+
+// TODO You should not allow context menus in head literals.
 
 function transformPattern(pattern, transform) {
     const transformed = {body: [], head: undefined};
     for (const cell of pattern.body) {
-        transformed.body.push([...transform(cell[0], cell[1]), cell[2]]);
+        if (cell[3] > 1) {
+            transformed.body.push([...cell]);
+        } else {
+            transformed.body.push([...transform(cell[0], cell[1]), cell[2], cell[3]]);
+        }
     }
-    transformed.head = [...transform(pattern.head[0], pattern.head[1]), pattern.head[2]]; // Do heads need color?
+    transformed.head = [...transform(pattern.head[0], pattern.head[1]), pattern.head[2]];
     return transformed;
 }
 
-function computeBasePatterns(color = 1) {
+function computeBasePatterns() {
     const basePattern = {body: [], head: undefined};
-    for (let i = -1; i < N_ROWS + 1; i ++) {
+    for (let i = -1; i < N_ROWS + 1; i++) {
         for (let j = -1; j < N_COLS + 1; j++) {
             if (PATTERN[i][j] === 1) {
                 if (i < 0 || j < 0 || i === N_ROWS || j === N_COLS) {
-                    basePattern.body.push([i, j, 0]);
+                    basePattern.body.push([i, j, -2, PATTERN_SEMANTICS[i][j]]);
                 } else {
-                    basePattern.body.push([i, j, BOARD[i][j]]);
+                    basePattern.body.push([i, j, BOARD[i][j], PATTERN_SEMANTICS[i][j]]);
                 }
             } else if (PATTERN[i][j] === 2) {
-                basePattern.head = [i, j, color];
+                basePattern.head = [i, j, 1]; // 1 stands for move...
+            } else if (PATTERN[i][j] === 3) {
+                basePattern.head = [i, j, -1]; // ... -1 stands for -move...
             }
         }
     }
@@ -109,16 +150,64 @@ function computeBasePatterns(color = 1) {
 }
 
 function transpileToRule(pattern) {
-    const headLiteral = "move(X,Y);";
+    const headLiteral = `${pattern.head[2] === -1 ? "-" : ""}move(X,Y);`;
     let bodyString = "legalMove(X,Y),";
     const headCoords = [pattern.head[0], pattern.head[1]];
-    let x, y;
     for (const cell of pattern.body) {
-        x = cell[0] - headCoords[0];
-        y = cell[1] - headCoords[1];
-        bodyString += `cell(X${x > 0 ? ("+" + x) : (x === 0 ? "" : x)},Y${y > 0 ? ("+" + y) : (y === 0 ? "" : y)},${cell[2]}),`;
+        bodyString += interpretSemantics(cell, headCoords);
+        // x = cell[0] - headCoords[0];
+        // y = cell[1] - headCoords[1];
+        // bodyString += `cell(X${x > 0 ? ("+" + x) : (x === 0 ? "" : x)},Y${y > 0 ? ("+" + y) : (y === 0 ? "" : y)},${cell[2]}),`;
     }
     return " :: " + bodyString.substring(0, bodyString.length - 1) + " implies " + headLiteral;
+}
+
+function interpretSemantics(cell, headCoords) {
+    const cellSemantics = PATTERN_SEMANTICS[cell[0]][cell[1]];
+    let x, y;
+    if (cellSemantics === 0) { // Default case.
+        // return [cell[0] - headCoords[0], cell[1] - headCoords[1], cell[2]];
+        x = cell[0] - headCoords[0];
+        y = cell[1] - headCoords[1];
+        return `cell(X${x > 0 ? ("+" + x) : (x === 0 ? "" : x)},Y${y > 0 ? ("+" + y) : (y === 0 ? "" : y)},${cell[2]}),`;
+    }
+    if (cell[0] < 0 || cell[1] < 0 || cell[0] === N_ROWS || cell[1] === N_COLS) { // Interpret border cell semantics.
+        if (cellSemantics === 1) {
+            x = cell[0] - headCoords[0];
+            y = cell[1] - headCoords[1];
+            return `cell(X${x > 0 ? ("+" + x) : (x === 0 ? "" : x)},Y${y > 0 ? ("+" + y) : (y === 0 ? "" : y)},0),`;
+            // return [cell[0] - headCoords[0], cell[1] - headCoords[1], 0];
+        } else if (cellSemantics === 2) {
+            x = cell[0];
+            y = cell[1];
+            return `cell(${x},${y},-2),`;
+            // return [cell[0], cell[1], -2];
+        } else if (cellSemantics === 3) {
+            x = cell[0];
+            y = cell[1];
+            return `cell(${x},${y},0),`;
+            // return [cell[0], cell[1], 0];
+        }
+    }
+    if (BOARD[cell[0]][cell[1]] === 0) { // Interpret empty cell semantics.
+        if (cellSemantics === 1) {
+            x = cell[0] - headCoords[0];
+            y = cell[1] - headCoords[1];
+            return `cell(X${x > 0 ? ("+" + x) : (x === 0 ? "" : x)},Y${y > 0 ? ("+" + y) : (y === 0 ? "" : y)},0),legalMove(X${x > 0 ? ("+" + x) : (x === 0 ? "" : x)},Y${y > 0 ? ("+" + y) : (y === 0 ? "" : y)}),`;
+            // return [cell[0] - headCoords[0], cell[1] - headCoords[1], 2];
+        } else if (cellSemantics === 2) {
+            x = cell[0];
+            y = cell[1];
+            return `cell(${x},${y},0),`;
+            // return [cell[0], cell[1], 0];
+        } else if (cellSemantics === 3) {
+            x = cell[0];
+            y = cell[1];
+            return `cell(${x},${y},0),legalMove(${x},${y}),`;
+            // return [cell[0], cell[1], 2];
+        }
+    }
+    return undefined; // No need to interpret occupied semantics so far.
 }
 
 function transpileToFn(pattern, ruleName) {
@@ -139,11 +228,15 @@ function transpileToFn(pattern, ruleName) {
 }
 
 function updatePolicy() {
-    let policyString = "";
+    let ruleString, policyString = "", ruleStrings = [];
     for (const pattern of basePatterns) {
-        policyString += "R" + N_RULES + transpileToRule(pattern) + "\n";
-        RULE_MAP.set("R" + N_RULES, transpileToFn(pattern, "R" + N_RULES));
-        N_RULES++;
+        ruleString = transpileToRule(pattern);
+        if (!ruleStrings.includes(ruleString)) {
+            policyString += "R" + N_RULES + ruleString + "\n";
+            RULE_MAP.set("R" + N_RULES, transpileToFn(pattern, "R" + N_RULES));
+            ruleStrings.push(ruleString);
+            N_RULES++;
+        }
     }
     coachedPolicyString += policyString;
 }
@@ -161,6 +254,8 @@ function removeHighlights() {
                 backgroundCell.classList.remove("body-cell");
             } else if (backgroundCell.classList.contains("head-cell")) {
                 backgroundCell.classList.remove("head-cell");
+            } else if (backgroundCell.classList.contains("negative-head-cell")) {
+                backgroundCell.classList.remove("negative-head-cell");
             }
         }
     }
@@ -179,6 +274,7 @@ function addPatternCells() {
             patternCell.classList.add("pattern-cell");
             patternCell.id = "pc|" + i + "|" + j;
             patternCell.onclick = (event) => {highlightCell(event);};
+            patternCell.addEventListener("contextmenu", openRightClickMenu);
             cell.append(patternCell);
         }
     }
@@ -219,7 +315,7 @@ function loadRuleMap() {
 
 function downloadPolicy() {
     const policyJSON = preparePolicyForDownload();
-    download("policy.json", JSON.stringify(policyJSON));
+    download("policy.json", JSON.stringify(policyJSON, null, 2));
 }
 
 function download(filename, content) {
@@ -241,14 +337,118 @@ function preparePolicyForDownload() {
     return policyJSON;
 }
 
+function existsValidPattern() {
+    let containsHead = false, containsBody = false;
+    for (let i = -1; i < N_ROWS + 1; i++) {
+        for (let j = -1; j < N_COLS + 1; j++) {
+            if (PATTERN[i][j] === 2 || PATTERN[i][j] === 3) {
+                containsHead = true;
+            } else if (PATTERN[i][j] === 1) {
+                containsBody = true;
+            }
+            if (containsBody && containsHead) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 function doneWithPattern() {
     removePatternCells();
     removeHighlights();
-    computeBasePatterns();
-    updatePolicy();
-    // TODO At this point, you have to collect all pattern cells and their colors, so as to generate the rules (which should be generated before this function returns!)
+    if (EXPLANATION["flipped"] && !alreadyFlipped) {
+        flipPieces(EXPLANATION["flipped"]);
+    }
+    if (existsValidPattern()) {
+        computeBasePatterns();
+        updatePolicy();
+    }
     const addButton = document.getElementById("add-button");
-    addButton.innerText = "Add Pattern";
+    addButton.innerText = "Offer Advice";
     addButton.onclick = addPattern;
     document.getElementById("blocker").remove();
+    if (document.getElementById("rightClickMenu")) {
+        closeRightClickMenu();
+    }
+}
+
+function openRightClickMenu(event) {
+    event.preventDefault();
+    const cell = event.target;
+    let splitId;
+    splitId = cell.id.split("|");
+    pRow = parseInt(splitId[1]);
+    pCol = parseInt(splitId[2]);
+    if (PATTERN[pRow][pCol] > 1) {
+        return;
+    }
+    let labels;
+    if (pRow < 0 || pCol < 0 || pRow === N_ROWS || pCol === N_COLS) {
+        labels = LABELS["border"];
+    } else if (BOARD[pRow][pCol] === 0) {
+        labels = LABELS["empty"];
+    } else {
+        labels = LABELS["occupied"];
+    }
+    const menuBlocker = document.createElement("div");
+    menuBlocker.classList.add("specification-menu-blocker");
+    menuBlocker.addEventListener("click", closeRightClickMenu);
+    menuBlocker.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        closeRightClickMenu();
+    });
+    menuBlocker.id = "menuBlocker";
+    document.body.append(menuBlocker);
+    const rightClickMenu = document.createElement("div");
+    rightClickMenu.classList.add("specification-menu-container");
+    rightClickMenu.id = "rightClickMenu";
+    rightClickMenu.style.top = event.pageY + "px";
+    rightClickMenu.style.left = event.pageX + "px";
+    rightClickMenu.innerHTML = labels["heading"];
+    rightClickMenu.appendChild(generateRadioRightClick(labels["labels"], labels["defaultIndex"]));
+    document.body.appendChild(rightClickMenu);
+}
+
+function closeRightClickMenu() {
+    const menuBlocker = document.getElementById("menuBlocker");
+    const rightClickMenu = document.getElementById("rightClickMenu");
+    updatePatternSemantics();
+    rightClickMenu.remove();
+    menuBlocker.remove();
+}
+
+function updatePatternSemantics() {
+    const radios = document.getElementsByName("menuRadio");
+    let cellSemantics = 0;
+    for (let i = 0; i < radios.length; i++) {
+        if (radios[i].checked) {
+            cellSemantics = i;
+        }
+    }
+    PATTERN_SEMANTICS[pRow][pCol] = cellSemantics;
+}
+
+function generateRadioRightClick(labels, defaultIndex) {
+    const container = document.createElement("div");
+    let label, divElement, inputElement, labelElement;
+    for (let i = 0; i < labels.length; i++) {
+        label = labels[i]
+        inputElement = document.createElement("input");
+        inputElement.type = "radio";
+        inputElement.id = label.toLowerCase().replace(/[^\w\s]/g,"").replace(/\s+/g,"-");
+        inputElement.name = "menuRadio";
+        // console.log(inputElement);
+        if (i === defaultIndex) {
+            inputElement.checked = true;
+        }
+        labelElement = document.createElement("label");
+        labelElement.htmlFor = label.toLowerCase();
+        labelElement.appendChild(document.createTextNode(label));
+        divElement = document.createElement("div");
+        divElement.appendChild(inputElement);
+        divElement.appendChild(labelElement);
+        container.appendChild(divElement);
+    }
+    return container;
 }
