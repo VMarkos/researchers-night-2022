@@ -213,15 +213,22 @@ function interpretSemantics(cell, headCoords) {
 function transpileToFn(pattern, ruleName) {
     const ruleTransforms = [];
     const headCoords = [pattern.head[0], pattern.head[1]];
-    let x, y;
+    let x, y, z;
     for (const cell of pattern.body) {
-        x = cell[0] - headCoords[0];
-        y = cell[1] - headCoords[1];
+        if (cell[3] > 1) {
+            x = cell[0];
+            y = cell[0];
+            z = 1;
+        } else {
+            x = cell[0] - headCoords[0];
+            y = cell[1] - headCoords[1];
+            z = 0;
+        }
         ruleTransforms.push((a, b) => {return [x + a, y + b];});
         if (RULE_MAP_JSON[ruleName]) {
-            RULE_MAP_JSON[ruleName].push([x, y]);
+            RULE_MAP_JSON[ruleName].push([x, y, z]);
         } else {
-            RULE_MAP_JSON[ruleName] = [[x, y]];
+            RULE_MAP_JSON[ruleName] = [[x, y, z]];
         }
     }
     return ruleTransforms;
@@ -307,7 +314,12 @@ function loadRuleMap() {
         ruleTransforms = [];
         for (const point of rulePoints) {
             // console.log(point);
-            ruleTransforms.push((a, b) => {return [point[0] + a, point[1] + b];});
+            ruleTransforms.push((a, b) => {
+                if (point[2] === 1) {
+                    return [point[0], point[1]];
+                }
+                return [point[0] + a, point[1] + b];
+            });
         }
         RULE_MAP.set(rule, ruleTransforms);
     }
