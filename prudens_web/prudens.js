@@ -307,21 +307,17 @@ function unify(x, y, sub=undefined) { // x, y are literals. Assymetric unificati
         yArg = yArgs[i];
         if (xArg["isExpression"]) {
             val = numParser(applyToString(xArg["value"], extendedSub)).call();
-            // console.log("val:", val);
             if (parseFloat(val) !== parseFloat(yArg["value"])) {
                 return undefined;
             }
-            // console.log("names:", xArg["name"], yArg["name"]);
-            // unifier[yArg["name"]] = val;
-            unifier[xArg["value"]] = val;
+            unifier[yArg["name"]] = val;
             continue;
         }
         val = numParser(applyToString(yArg["value"], extendedSub)).call();
         if (parseFloat(val) !== parseFloat(xArg["value"])) {
             return undefined;
         }
-        // unifier[xArg["name"]] = val;
-        unifier[yArg["value"]] = val;
+        unifier[xArg["name"]] = val;
     }
     return unifier;
 }

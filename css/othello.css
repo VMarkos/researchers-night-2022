@@ -22,7 +22,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    max-width: 511px;
+    max-width: 409px;
     padding: 20px 40px 40px 40px;
     border: 1px solid rgba(0, 0, 0, .1);
     border-radius: 10px;
@@ -61,7 +61,7 @@ body {
     flex-direction: column;
     margin-top: 20px;
     width: 100%;
-    max-width: 511px;
+    max-width: 409px;
     align-self: stretch;
 }
 
@@ -80,29 +80,6 @@ body {
     border-left: 4px solid white;
     margin-top: 12px;
     box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.7);
-}
-
-.uploads-container {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-evenly;
-    padding: 5px;
-    margin-top: 20px;
-}
-
-.upload-button {
-    background-color: rgba(80, 100, 240);
-    padding: 5px 10px 5px 10px;
-    border-radius: 2px;
-    box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.7);
-    width: fit-content;
-    font-size: larger;
-    cursor: pointer;
-    transition-duration: 200ms;
-}
-
-input[type="file"] {
-    display: none;
 }
 
 .buttons-container {
@@ -134,19 +111,7 @@ input[type="file"] {
     transition-duration: 200ms;
 }
 
-.add-button {
-    background-color: rgba(60, 164, 60, 1.0);
-    padding: 5px 10px 5px 10px;
-    border-radius: 2px;
-    box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.7);
-    width: fit-content;
-    font-size: larger;
-    cursor: pointer;
-    transition-duration: 200ms;
-    z-index: 7;
-}
-
-.why-button:hover, .reset-button:hover, .add-button:hover, .upload-button:hover {
+.why-button:hover, .reset-button:hover {
     opacity: 0.9;
 }
 
@@ -239,8 +204,7 @@ li.literal + li.literal {
     gap: 1px;
     padding: 1px;
     box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.7);
-    max-width: 509px;
-    z-index: 4;
+    max-width: 407px;
 }
 
 .othello-cell {
@@ -252,13 +216,6 @@ li.literal + li.literal {
 
 .highlighted {
     background-color: rgba(199, 75, 80, 1);
-}
-
-.border-cell {
-    background-color: #1f5a5b;
-    width: 50px;
-    height: 50px;
-    position: relative;
 }
 
 .othello-piece-white {
@@ -308,7 +265,7 @@ li.literal + li.literal {
 .footer-container {
     display: flex;
     flex-direction: row;
-    justify-content: flex-end;
+    justify-content: space-between;
     align-items: center;
     margin-top: 20px;
 }
@@ -392,7 +349,6 @@ li.literal + li.literal {
     z-index: 3;
     width: 100%;
     height: 100%;
-    background-color: rgba(19, 13, 13, 0.5);
 }
 
 /* Animation */
@@ -404,66 +360,4 @@ li.literal + li.literal {
 .translate-board-up {
     transition-duration: 0ms;
     transform: translateY(20px);
-}
-
-/* Coachello */
-
-.pattern-cell {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
-    z-index: 5;
-}
-
-.body-cell {
-    background-color: rgba(190, 95, 30, 1);
-}
-
-.head-cell {
-    background-color: rgba(16, 40, 150);
-}
-
-.negative-head-cell {
-    background-color: #a62349;
-}
-
-.body-cell-explanation {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 42px;
-    height: 42px;
-    border: solid 4px rgba(190, 95, 30, 1);
-}
-
-.head-cell-explanation {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 42px;
-    height: 42px;
-    border: solid 4px rgba(16, 40, 150);
-}
-
-/* Right click menu */
-
-.specification-menu-blocker {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 6;
-}
-
-.specification-menu-container {
-    position: absolute;
-    padding: 10px;
-    border-radius: 1px;
-    background-color: whitesmoke;
-    box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, .3);
-    z-index: 7;
 }
