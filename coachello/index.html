@@ -47,14 +47,51 @@
                 </div>
                 <div id="uploads-container" class="uploads-container">
                     <input type="file" id="policy-file"/>
-                    <input type="file" id="game-file"/>
+                    <!-- <input type="file" id="game-file"/> -->
                     <div id="policy-button" class="upload-button">Upload Policy</div>
-                    <div id="game-button" class="upload-button">Upload Game</div>
+                    <!-- <div id="game-button" class="upload-button">Upload Game</div> -->
                     <div id="download-button" class="upload-button" onclick="downloadPolicy()">Download Policy</div>
                 </div>
-                <div id="explanation-text" class="explanation-text">
+                <div class="game-navigation-container">
+                    <div class="game-up-down-load-container">
+                        <div class="game-load-container">
+                            Upload Game <i class="fa fa-upload"></i>
+                        </div>
+                        <div class="game-load-container">
+                            Download Game <i class="fa fa-download"></i>
+                        </div>
+                    </div>
+                    <div class="game-history-container">
+                        <div id="move-numbers" class="move-number-container">
+                            
+                        </div>
+                        <div id="moves" class="moves-container">
+                            <div id="black-moves" class="moves-col">
 
+                            </div>
+                            <div id="white-moves" class="moves-col">
+                                
+                            </div>
+                        </div>
+                    </div>
+                    <div class="game-navbar-container">
+                        <div id="fast-backward" class="navigation-button inactive">
+                            <i class="fa fa-fast-backward"></i>
+                        </div>
+                        <div id="step-backward" class="navigation-button inactive">
+                            <i class="fa fa-step-backward"></i>
+                        </div>
+                        <div id="step-forward" class="navigation-button inactive">
+                            <i class="fa fa-step-forward"></i>
+                        </div>
+                        <div id="fast-forward" class="navigation-button inactive">
+                            <i class="fa fa-fast-forward"></i>
+                        </div>
+                    </div>
                 </div>
+                <!-- <div id="explanation-text" class="explanation-text">
+
+                </div> -->
                 <div id="info-container" class="footer-container">
                     <!-- <div class="tour-container" onclick="startTour()">
                         Take a Tour!

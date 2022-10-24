@@ -59,6 +59,7 @@ body {
 .explanation-container {
     display: flex;
     flex-direction: column;
+    gap: 20px;
     margin-top: 20px;
     width: 100%;
     max-width: 511px;
@@ -87,7 +88,7 @@ body {
     flex-direction: row;
     justify-content: space-evenly;
     padding: 5px;
-    margin-top: 20px;
+    /* margin-top: 20px; */
 }
 
 .upload-button {
@@ -310,7 +311,7 @@ li.literal + li.literal {
     flex-direction: row;
     justify-content: flex-end;
     align-items: center;
-    margin-top: 20px;
+    /* margin-top: 20px; */
 }
 
 .help-container, .tour-container {
@@ -466,4 +467,119 @@ li.literal + li.literal {
     background-color: whitesmoke;
     box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, .3);
     z-index: 7;
+}
+
+/* Game navigation */
+
+.game-up-down-load-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.game-load-container {
+    padding: 5px;
+    border-radius: 2px;
+    transition-duration: 200ms;
+    cursor: pointer;
+}
+
+.game-load-container:hover {
+    background-color: rgba(250, 250, 250, .1);
+}
+
+.game-navbar-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 20px;
+    padding: 20px;
+}
+
+.navigation-button {
+    position: relative;
+    padding: 5px 10px 5px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    cursor: pointer;
+    /* box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, .3); */
+    color: white;
+    transition-duration: 200ms;
+}
+
+.navigation-button:hover {
+    padding: 5px 10px 5px 10px;
+    border-radius: 5px;
+    background-color: rgba(61, 83, 88, 1.0);
+    box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, .3);
+    color: white;
+}
+
+.inactive {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.game-navigation-container {
+    align-self: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.game-history-container {
+    display: flex;
+}
+
+.move-number-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    row-gap: 5px;
+    background-color: #0f3a3b;
+    border-radius: 5px 0px 0px 5px;
+    box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, .3);
+    padding: 10px;
+    min-width: 1.2em;
+    height: 200px;
+    overflow: hidden;
+}
+
+.moves-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    /* row-gap: 5px; */
+    background-color: #1f5a5b;
+    border-radius: 0px 5px 5px 0px;
+    box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, .3);
+    padding: 10px;
+    width: 200px;
+    height: 200px;
+    overflow-y: auto;
+}
+
+.moves-col {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.move-span {
+    padding: 2px 4px 0px 4px;
+    width: fit-content;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.move-span:hover {
+    background-color: rgba(250, 250, 250, 0.1);
+}
+
+.last-move-span {
+    background-color: rgba(250, 250, 250, 0.2);
+}
+
+.number-span {
+    padding: 2px 0px 0px 0px;
+    width: fit-content;
 }
