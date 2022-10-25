@@ -492,8 +492,8 @@ li.literal + li.literal {
     display: flex;
     flex-direction: row;
     justify-content: center;
-    gap: 20px;
-    padding: 20px;
+    gap: 15px;
+    padding: 10px 0px 10px 0px;
 }
 
 .navigation-button {
@@ -547,7 +547,7 @@ li.literal + li.literal {
 
 .moves-container {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(4, 1fr);
     /* row-gap: 5px; */
     background-color: #1f5a5b;
     border-radius: 0px 5px 5px 0px;

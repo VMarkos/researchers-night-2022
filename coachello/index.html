@@ -43,22 +43,24 @@
                 <div id="buttons-container" class="buttons-container">
                     <div id="add-button" class="add-button" onclick="addPattern()">Offer Advice</div>
                     <div class="why-button" onclick="explain()">Get Explanation</div>
-                    <div class="reset-button" onclick="reset()">Reset Game</div>
                 </div>
                 <div id="uploads-container" class="uploads-container">
                     <input type="file" id="policy-file"/>
                     <!-- <input type="file" id="game-file"/> -->
-                    <div id="policy-button" class="upload-button">Upload Policy</div>
+                    <div id="policy-button" class="upload-button">Load Policy</div>
                     <!-- <div id="game-button" class="upload-button">Upload Game</div> -->
-                    <div id="download-button" class="upload-button" onclick="downloadPolicy()">Download Policy</div>
+                    <div id="download-button" class="upload-button" onclick="downloadPolicy()">Save Policy</div>
                 </div>
                 <div class="game-navigation-container">
                     <div class="game-up-down-load-container">
                         <div class="game-load-container">
-                            Upload Game <i class="fa fa-upload"></i>
+                            Load <i class="fa fa-upload"></i>
                         </div>
                         <div class="game-load-container">
-                            Download Game <i class="fa fa-download"></i>
+                            Save <i class="fa fa-download"></i>
+                        </div>
+                        <div class="game-load-container" onclick="reset()">
+                            New  <i class="fa fa-arrow-circle-o-right"></i>
                         </div>
                     </div>
                     <div class="game-history-container">
@@ -66,7 +68,13 @@
                             
                         </div>
                         <div id="moves" class="moves-container">
+                            <div id="pending-black-moves" class="moves-col">
+
+                            </div>
                             <div id="black-moves" class="moves-col">
+
+                            </div>
+                            <div id="pending-white-moves" class="moves-col">
 
                             </div>
                             <div id="white-moves" class="moves-col">
@@ -80,6 +88,9 @@
                         </div>
                         <div id="step-backward" class="navigation-button inactive">
                             <i class="fa fa-step-backward"></i>
+                        </div>
+                        <div id="play-pause" class="navigation-button inactive">
+                            <i class="fa fa-play"></i>
                         </div>
                         <div id="step-forward" class="navigation-button inactive">
                             <i class="fa fa-step-forward"></i>

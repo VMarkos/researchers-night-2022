@@ -14,6 +14,7 @@ let PLAYING = false;
 let EMPTY_CELLS;
 let NO_LEGAL_MOVES = false;
 let TEMP_BOARD = undefined;
+let MACHINE_COLOR = 1;
 
 let EXPLANATION = {};
 
@@ -22,6 +23,9 @@ let EXPLANATION_BORDERS = [];
 let CURRENT_GAME = [];
 let currentMove;
 let canMoveForward = false, canMoveBackward = false;
+let highlightedCell = "";
+
+const highlightEvent = new Event("highlight");
 
 /* Current Game Structure:
 [
@@ -124,7 +128,7 @@ function drawLegalMoves(color = -1, interactive = true, legalMoves = undefined) 
         if (color === -1 && interactive) {
             legalMove.addEventListener("mouseup", () => {
                 removeExplanationBorders();
-                console.log("Interactive!");
+                // console.log("Interactive!");
                 coords = cellId.split("-");
                 row = parseInt(coords[1]);
                 col = parseInt(coords[2]);
@@ -369,7 +373,23 @@ function randomMove(color = -1) {
 	} while (!LEGAL_MOVES.includes("oc-" + row + "-" + col));
 	const cellId = "oc-" + row + "-" + col;
 	updateLastMove(cellId);
-	makeSingleMove(row, col, color);
+    if (color === MACHINE_COLOR) {
+        const playButton = document.getElementById("play-pause");
+        playButton.classList.remove("inactive");
+        const cell = document.getElementById(cellId);
+        cell.classList.add("highlighted");
+        const makeMove = () => {
+            makeSingleMove(row, col, color);
+            // const playButton = document.getElementById("play-pause");
+            playButton.removeEventListener("click", makeMove, false);
+            playButton.classList.add("inactive");
+            cell.classList.remove("highlighted");
+        };
+        console.log("moved randomly");
+        playButton.addEventListener("click", makeMove, false);
+    } else {
+        makeSingleMove(row, col, color);
+    }
 	if (isGameOver()) {
 		return 1;
 	}
@@ -408,6 +428,7 @@ function makeDoubleMove(row, col, color = -1) {
         return;
     }
     if (LEGAL_MOVES.length > 0) {
+        console.log("waiting");
         setTimeout(() => {
             const move = prudensMove((-1) * color);
         }, 500);
@@ -424,7 +445,7 @@ function makeDoubleMove(row, col, color = -1) {
     }
 }
 
-function previousMove() {
+function previousMove(casualCall = true) {
     if (!canMoveForward) {
         canMoveForward = true;
         const stepForward = document.getElementById("step-forward");
@@ -433,6 +454,14 @@ function previousMove() {
         const fastForward = document.getElementById("fast-forward");
         fastForward.classList.remove("inactive");
         fastForward.addEventListener("click", forwardFast, false);
+    }
+    const lastDot = document.getElementById("last-dot");
+    // console.log("Is casual call?", casualCall);
+    if (lastDot && casualCall) {
+        lastDot.id = "";
+        lastDot.classList.remove("fa-dot-circle-o");
+        lastDot.classList.add("fa-circle-o");
+        document.getElementById(highlightedCell).classList.remove("highlighted");
     }
     currentMove--;
     updateMoveSpan();
@@ -448,8 +477,8 @@ function previousMove() {
     updateScore(color, ...countStones(thisMove["board"]));
     if (currentMove === 0) {
         canMoveBackward = false;
-        console.log(canMoveForward, canMoveBackward);
-        console.log("In");
+        // console.log(canMoveForward, canMoveBackward);
+        // console.log("In");
         const fastBackward = document.getElementById("fast-backward");
         fastBackward.classList.add("inactive");
         fastBackward.removeEventListener("click", backwardFast, false);
@@ -490,21 +519,24 @@ function countStones(board) {
     return [blacks, whites];
 }
 
-function backwardFast(existsPreviousMove = true, moveCount = 65) {
-    console.log("backward-fast");
+function backwardFast(existsPreviousMove = true, moveCount = 65, cell = undefined, casualCall = true) {
+    // console.log("backward-fast");
     if (existsPreviousMove && moveCount > 0) {
-        existsPreviousMove = previousMove();
+        existsPreviousMove = previousMove(casualCall);
         moveCount--
-        setTimeout(() => {backwardFast(existsPreviousMove, moveCount);}, 50);
+        setTimeout(() => {backwardFast(existsPreviousMove, moveCount, cell, casualCall);}, 50);
     }
     if (!existsPreviousMove) {
-        console.log("removed bf:", moveCount);
+        // console.log("removed bf:", moveCount);
         const fastBackward = document.getElementById("fast-backward");
         fastBackward.removeEventListener("click", backwardFast, false);
     }
+    if (cell && moveCount === 0) {
+        cell.dispatchEvent(highlightEvent);
+    }
 }
 
-function nextMove() {
+function nextMove(casualCall = true) {
     if (!canMoveBackward) {
         canMoveBackward = true;
         const stepBackward = document.getElementById("step-backward");
@@ -513,6 +545,13 @@ function nextMove() {
         const fastBackward = document.getElementById("fast-backward");
         fastBackward.classList.remove("inactive");
         fastBackward.addEventListener("click", backwardFast, false);
+    }
+    const lastDot = document.getElementById("last-dot");
+    if (lastDot && casualCall) {
+        lastDot.id = "";
+        lastDot.classList.remove("fa-dot-circle-o");
+        lastDot.classList.add("fa-circle-o");
+        document.getElementById(highlightedCell).classList.remove("highlighted");
     }
     currentMove++;
     updateMoveSpan();
@@ -530,7 +569,7 @@ function nextMove() {
         drawBoard(BOARD);
         // updateScore(color, ...countStones(BOARD));
         drawLegalMoves((-1) * color);
-        console.log("LM:", LEGAL_MOVES);
+        // console.log("LM:", LEGAL_MOVES);
         const fastForward = document.getElementById("fast-forward");
         fastForward.classList.add("inactive");
         fastForward.removeEventListener("click", forwardFast, false);
@@ -557,36 +596,41 @@ function nextMove() {
     return value;
 }
 
-function forwardFast(existsNextMove = true, moveCount = 65) {
+function forwardFast(existsNextMove = true, moveCount = 65, cell = undefined, casualCall = true) {
     if (existsNextMove && moveCount > 0) {
-        existsNextMove = nextMove();
+        existsNextMove = nextMove(casualCall);
         moveCount--;
-        setTimeout(() => {forwardFast(existsNextMove, moveCount);}, 50);
+        setTimeout(() => {forwardFast(existsNextMove, moveCount, cell, casualCall);}, 50);
     }
     if (!existsNextMove) {
         const fastForward = document.getElementById("fast-forward");
         fastForward.removeEventListener("click", forwardFast, false);
     }
+    if (cell && moveCount === 0) {
+        cell.dispatchEvent(highlightEvent);
+    }
 }
 
-function updateMoveSpan() {
+function updateMoveSpan(moveCols = 2) {
     let index;
     if (currentMove === 0) {
         index = 0;
-    } else if (currentMove % 2 === 1) {
-        index = Math.floor(currentMove / 2);
+    } else if (currentMove % moveCols === 1) {
+        index = Math.floor(CURRENT_GAME.length / moveCols) + Math.floor(currentMove / moveCols);
     } else {
-        index = Math.floor(CURRENT_GAME.length / 2) + Math.floor(currentMove / 2) - 1;
+        index = Math.floor(3 * CURRENT_GAME.length / moveCols) + Math.floor(currentMove / moveCols) - 1;
     }
     const previousSpan = document.getElementById("last-move-span");
-    let currentMoveNumber = currentMove;
+    // let currentMoveNumber = currentMove;
     if (previousSpan) {
         previousSpan.classList.remove("last-move-span");
-        previousSpan.id = null;
-        currentMoveNumber = parseInt(previousSpan.getAttribute("data-move-number"));
+        previousSpan.id = "";
+        // currentMoveNumber = parseInt(previousSpan.getAttribute("data-move-number"));
     }
     if (currentMove !== 0) {
         const targetSpan = document.getElementsByClassName("move-span")[index];
+        // console.log("spans:", document.getElementsByClassName("move-span"));
+        // console.log("index:", index);
         targetSpan.classList.add("last-move-span");
         targetSpan.id = "last-move-span";
         targetSpan.scrollIntoView();
@@ -594,6 +638,17 @@ function updateMoveSpan() {
 }
 
 function appendMoveToGameHistory(row, col, color) {
+    const pendingMoveContainer = document.getElementById(`pending-${color === 1 ? "white" : "black"}-moves`);
+    const pendingMove = document.createElement("span");
+    pendingMove.classList.add("move-span");
+    pendingMove.setAttribute("data-move-number", "" + currentMove);
+    pendingMove.addEventListener("click", goToPendingMove, false);
+    const emptyDot = document.createElement("i")
+    emptyDot.classList.add("fa");
+    emptyDot.classList.add("fa-circle-o");
+    pendingMove.append(emptyDot);
+    pendingMoveContainer.append(pendingMove);
+    // Add the actual move.
     const moveString = translateMove(row, col, color);
     const moveContainer = document.getElementById(`${color === 1 ? "white" : "black"}-moves`);
     const moveSpan = document.createElement("span");
@@ -601,7 +656,7 @@ function appendMoveToGameHistory(row, col, color) {
     const previousSpan = document.getElementById("last-move-span");
     if (previousSpan) {
         previousSpan.classList.remove("last-move-span");
-        previousSpan.id = null;
+        previousSpan.id = "";
     }
     moveSpan.id = "last-move-span";
     moveSpan.classList.add("last-move-span");
@@ -619,8 +674,42 @@ function appendMoveToGameHistory(row, col, color) {
     }
 }
 
+function goToPendingMove(event) {
+    if (highlightedCell) {
+        document.getElementById(highlightedCell).classList.remove("highlighted");
+    }
+    const targetSpan = event.currentTarget;
+    console.log(targetSpan);
+    const emptyDot = targetSpan.firstChild;
+    const lastDot = document.getElementById("last-dot");
+    if (lastDot) {
+        lastDot.id = "";
+        lastDot.classList.remove("fa-dot-circle-o");
+        lastDot.classList.add("fa-circle-o");
+    }
+    emptyDot.id = "last-dot";
+    emptyDot.classList.remove("fa-circle-o");
+    emptyDot.classList.add("fa-dot-circle-o");
+    const moveNumber = parseInt(targetSpan.getAttribute("data-move-number"));
+    let currentMoveNumber = currentMove;
+    const cell = document.getElementById("oc-" + CURRENT_GAME[moveNumber - 1]["cell"].join("-"));
+    cell.addEventListener("highlight", highlightPendingCell, false);
+    removeLastDot = false;
+    if (moveNumber < currentMoveNumber) {
+        backwardFast(true, currentMoveNumber - moveNumber + 1, cell, false);
+    } else if (moveNumber > currentMoveNumber) {
+        forwardFast(true, moveNumber - currentMoveNumber - 1, cell, false);
+    }
+}
+
+function highlightPendingCell(event) {
+    event.target.classList.add("highlighted");
+    event.target.removeEventListener("highlight", highlightPendingCell, false);
+    highlightedCell = event.target.id;
+}
+
 function goToMove(event) {
-    const targetSpan = event.target;
+    const targetSpan = event.currentTarget;
     const moveNumber = parseInt(targetSpan.getAttribute("data-move-number"));
     let currentMoveNumber = currentMove;
     if (moveNumber < currentMoveNumber) {
@@ -644,6 +733,15 @@ function scrollGameHistory() {
     numbersContainer.scrollTop = moves.scrollTop;
 }
 
+function resetGameHistory() {
+    const blackMoves = document.getElementById("black-moves");
+    const whiteMoves = document.getElementById("white-moves");
+    const moveNums = document.getElementById("move-numbers");
+    blackMoves.innerHTML = "";
+    whiteMoves.innerHTML = "";
+    moveNums.innerHTML = "";
+}
+
 function reset() {
     PLAYING = false;
     const board = document.getElementById("board-container");
@@ -652,6 +750,7 @@ function reset() {
     downloadPolicy();
     coachedPolicyString = "";
     currentMove = undefined;
+    resetGameHistory();
     initializeBoard();
 }
 
@@ -697,7 +796,17 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
         // console.log("Not legal:", LEGAL_MOVES, cellId);
 		return -1;
 	}
-	makeSingleMove(row, col, color);
+    const playButton = document.getElementById("play-pause");
+    playButton.classList.remove("inactive");
+    const makeMove = () => {
+        makeSingleMove(row, col, color);
+        const playButton = document.getElementById("play-pause");
+        playButton.removeEventListener("click", makeMove, false);
+        playButton.classList.add("inactive");
+    };
+    console.log("moved");
+    playButton.addEventListener("click", makeMove, false);
+	// makeSingleMove(row, col, color);
     // randomMove(1);
     // console.log(isGameOver());
 	if (isGameOver()) {
