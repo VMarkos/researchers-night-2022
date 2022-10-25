@@ -378,12 +378,14 @@ function randomMove(color = -1) {
         playButton.classList.remove("inactive");
         const cell = document.getElementById(cellId);
         cell.classList.add("highlighted");
+        highlightedCell = cellId;
         const makeMove = () => {
             makeSingleMove(row, col, color);
             // const playButton = document.getElementById("play-pause");
             playButton.removeEventListener("click", makeMove, false);
             playButton.classList.add("inactive");
             cell.classList.remove("highlighted");
+            highlightedCell = "";
         };
         console.log("moved randomly");
         playButton.addEventListener("click", makeMove, false);
@@ -462,6 +464,7 @@ function previousMove(casualCall = true) {
         lastDot.classList.remove("fa-dot-circle-o");
         lastDot.classList.add("fa-circle-o");
         document.getElementById(highlightedCell).classList.remove("highlighted");
+        highlightedCell = ""
     }
     currentMove--;
     updateMoveSpan();
@@ -552,6 +555,7 @@ function nextMove(casualCall = true) {
         lastDot.classList.remove("fa-dot-circle-o");
         lastDot.classList.add("fa-circle-o");
         document.getElementById(highlightedCell).classList.remove("highlighted");
+        highlightedCell = "";
     }
     currentMove++;
     updateMoveSpan();
@@ -798,11 +802,16 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
 	}
     const playButton = document.getElementById("play-pause");
     playButton.classList.remove("inactive");
+    const cell = document.getElementById(cellId);
+    cell.classList.add("highlighted");
+    highlightedCell = cellId;
     const makeMove = () => {
         makeSingleMove(row, col, color);
         const playButton = document.getElementById("play-pause");
         playButton.removeEventListener("click", makeMove, false);
         playButton.classList.add("inactive");
+        cell.classList.remove("highlighted");
+        highlightedCell = "";
     };
     console.log("moved");
     playButton.addEventListener("click", makeMove, false);
