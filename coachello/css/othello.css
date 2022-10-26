@@ -114,6 +114,7 @@ input[type="file"] {
 }
 
 .why-button {
+    position: relative;
     background-color: tomato;
     padding: 5px 10px 5px 10px;
     border-radius: 2px;
@@ -136,6 +137,7 @@ input[type="file"] {
 }
 
 .add-button {
+    position: relative;
     background-color: rgba(60, 164, 60, 1.0);
     padding: 5px 10px 5px 10px;
     border-radius: 2px;
@@ -147,7 +149,7 @@ input[type="file"] {
     z-index: 7;
 }
 
-.why-button:hover, .reset-button:hover, .add-button:hover, .upload-button:hover {
+.why-button:not(.inactive):hover, .reset-button:not(.inactive):hover, .add-button:not(.inactive):hover, .upload-button:not(.inactive):hover {
     opacity: 0.9;
 }
 
@@ -296,10 +298,10 @@ li.literal + li.literal {
 
 .othello-last-move {
     position: absolute;
-    left: 18px;
-    top: 18px;
-    width: 4px;
-    height: 4px;
+    left: 17px;
+    top: 17px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background-color: rgba(199, 75, 80, 1);
 }
@@ -520,6 +522,24 @@ li.literal + li.literal {
     cursor: not-allowed;
 }
 
+.navigation-button.inactive {
+    opacity: 0.3;
+}
+
+.game-stuff-container {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+}
+
+.game-settings-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    border-left: rgba(250, 250, 250, 0.2) solid 1px;
+    padding-left: 10px;
+}
+
 .game-navigation-container {
     align-self: center;
     display: flex;
@@ -571,8 +591,13 @@ li.literal + li.literal {
     cursor: pointer;
 }
 
-.move-span:hover {
+.move-span:not(.inactive):hover {
     background-color: rgba(250, 250, 250, 0.1);
+}
+
+.move-span.inactive {
+    cursor: default;
+    opacity: 1.0;
 }
 
 .last-move-span {
@@ -582,4 +607,48 @@ li.literal + li.literal {
 .number-span {
     padding: 2px 0px 0px 0px;
     width: fit-content;
+}
+
+/* Slider */
+
+.setting-container {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    transition-duration: 200ms;
+}
+
+.setting-text {
+    padding: 5px;
+}
+
+.switch {
+    position: relative;
+    width: 40px;
+    height: 24px;
+    border-radius: 24px;
+    background-color: rgba(250, 250, 250, 0.3);
+    transition-duration: 200ms;
+}
+
+.switch.active {
+    background-color: rgba(60, 164, 60, 1.0);
+}
+
+.switch-ball {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: white;
+    cursor: pointer;
+    transition-duration: 200ms;
+}
+
+.switch-ball.active {
+    left: 19px;
 }

@@ -15,6 +15,7 @@ let EMPTY_CELLS;
 let NO_LEGAL_MOVES = false;
 let TEMP_BOARD = undefined;
 let MACHINE_COLOR = 1;
+let MODE = 0; // 0 = playing, 1 = auditing.
 
 let EXPLANATION = {};
 
@@ -373,25 +374,26 @@ function randomMove(color = -1) {
 	} while (!LEGAL_MOVES.includes("oc-" + row + "-" + col));
 	const cellId = "oc-" + row + "-" + col;
 	updateLastMove(cellId);
-    if (color === MACHINE_COLOR) {
-        const playButton = document.getElementById("play-pause");
-        playButton.classList.remove("inactive");
-        const cell = document.getElementById(cellId);
-        cell.classList.add("highlighted");
-        highlightedCell = cellId;
-        const makeMove = () => {
-            makeSingleMove(row, col, color);
-            // const playButton = document.getElementById("play-pause");
-            playButton.removeEventListener("click", makeMove, false);
-            playButton.classList.add("inactive");
-            cell.classList.remove("highlighted");
-            highlightedCell = "";
-        };
-        console.log("moved randomly");
-        playButton.addEventListener("click", makeMove, false);
-    } else {
-        makeSingleMove(row, col, color);
-    }
+    makeSingleMove(row, col, color);
+    // if (color === MACHINE_COLOR) {
+    //     const playButton = document.getElementById("play-pause");
+    //     playButton.classList.remove("inactive");
+    //     const cell = document.getElementById(cellId);
+    //     cell.classList.add("highlighted");
+    //     highlightedCell = cellId;
+    //     const makeMove = () => {
+    //         makeSingleMove(row, col, color);
+    //         // const playButton = document.getElementById("play-pause");
+    //         playButton.removeEventListener("click", makeMove, false);
+    //         playButton.classList.add("inactive");
+    //         cell.classList.remove("highlighted");
+    //         highlightedCell = "";
+    //     };
+    //     console.log("moved randomly");
+    //     playButton.addEventListener("click", makeMove, false);
+    // } else {
+    //     makeSingleMove(row, col, color);
+    // }
 	if (isGameOver()) {
 		return 1;
 	}
@@ -400,13 +402,21 @@ function randomMove(color = -1) {
 
 function makeDoubleMove(row, col, color = -1) {
     if (!PLAYING) {
-        const stepBackward = document.getElementById("step-backward");
-        stepBackward.addEventListener("click", previousMove, false);
-        stepBackward.classList.remove("inactive");
-        const fastBackward = document.getElementById("fast-backward");
-        fastBackward.addEventListener("click", backwardFast, false);
-        fastBackward.classList.remove("inactive");
         PLAYING = true;
+        const modeSetting = document.getElementById("mode-setting-container");
+        modeSetting.classList.add("inactive");
+        const blocker = document.createElement("div");
+        blocker.classList.add("specification-menu-blocker");
+        modeSetting.append(blocker);
+        setupMode();
+        if (MODE === 1) { // TODO This should be changed, since no moves should be played in audit mode.
+            const stepBackward = document.getElementById("step-backward");
+            stepBackward.addEventListener("click", previousMove, false);
+            stepBackward.classList.remove("inactive");
+            const fastBackward = document.getElementById("fast-backward");
+            fastBackward.addEventListener("click", backwardFast, false);
+            fastBackward.classList.remove("inactive");
+        }
     }
     // const explanationContainer = document.getElementById("explanation-text");
     // explanationContainer.innerHTML = "";
@@ -642,21 +652,32 @@ function updateMoveSpan(moveCols = 2) {
 }
 
 function appendMoveToGameHistory(row, col, color) {
+    // if (MODE === 0) {
     const pendingMoveContainer = document.getElementById(`pending-${color === 1 ? "white" : "black"}-moves`);
     const pendingMove = document.createElement("span");
     pendingMove.classList.add("move-span");
     pendingMove.setAttribute("data-move-number", "" + currentMove);
-    pendingMove.addEventListener("click", goToPendingMove, false);
+    if (MODE === 0) {
+        pendingMove.classList.add("inactive");
+    } else {
+        pendingMove.addEventListener("click", goToPendingMove, false);
+    }
     const emptyDot = document.createElement("i")
     emptyDot.classList.add("fa");
     emptyDot.classList.add("fa-circle-o");
     pendingMove.append(emptyDot);
     pendingMoveContainer.append(pendingMove);
+    // }
     // Add the actual move.
     const moveString = translateMove(row, col, color);
     const moveContainer = document.getElementById(`${color === 1 ? "white" : "black"}-moves`);
     const moveSpan = document.createElement("span");
     moveSpan.classList.add("move-span");
+    if (MODE === 0) {
+        moveSpan.classList.add("inactive");
+    } else {
+        moveSpan.addEventListener("click", goToMove, false);
+    }
     const previousSpan = document.getElementById("last-move-span");
     if (previousSpan) {
         previousSpan.classList.remove("last-move-span");
@@ -666,7 +687,6 @@ function appendMoveToGameHistory(row, col, color) {
     moveSpan.classList.add("last-move-span");
     moveSpan.innerText = moveString;
     moveSpan.setAttribute("data-move-number", "" + currentMove);
-    moveSpan.addEventListener("click", goToMove, false);
     moveContainer.append(moveSpan);
     moveSpan.scrollIntoView();
     if (color === -1) {
@@ -720,6 +740,20 @@ function goToMove(event) {
         backwardFast(true, currentMoveNumber - moveNumber);
     } else if (moveNumber > currentMoveNumber) {
         forwardFast(true, moveNumber - currentMoveNumber);
+    }
+}
+
+function changeGameMode() {
+    const switchContainer = document.getElementById("mode-switch");
+    const ball = document.getElementById("mode-ball");
+    if (MODE === 0) {
+        switchContainer.classList.add("active");
+        ball.classList.add("active");
+        MODE = 1;
+    } else {
+        switchContainer.classList.remove("active");
+        ball.classList.remove("active");
+        MODE = 0;
     }
 }
 
@@ -800,22 +834,22 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
         // console.log("Not legal:", LEGAL_MOVES, cellId);
 		return -1;
 	}
-    const playButton = document.getElementById("play-pause");
-    playButton.classList.remove("inactive");
-    const cell = document.getElementById(cellId);
-    cell.classList.add("highlighted");
-    highlightedCell = cellId;
-    const makeMove = () => {
-        makeSingleMove(row, col, color);
-        const playButton = document.getElementById("play-pause");
-        playButton.removeEventListener("click", makeMove, false);
-        playButton.classList.add("inactive");
-        cell.classList.remove("highlighted");
-        highlightedCell = "";
-    };
-    console.log("moved");
-    playButton.addEventListener("click", makeMove, false);
-	// makeSingleMove(row, col, color);
+    // const playButton = document.getElementById("play-pause");
+    // playButton.classList.remove("inactive");
+    // const cell = document.getElementById(cellId);
+    // cell.classList.add("highlighted");
+    // highlightedCell = cellId;
+    // const makeMove = () => {
+    //     makeSingleMove(row, col, color);
+    //     const playButton = document.getElementById("play-pause");
+    //     playButton.removeEventListener("click", makeMove, false);
+    //     playButton.classList.add("inactive");
+    //     cell.classList.remove("highlighted");
+    //     highlightedCell = "";
+    // };
+    // console.log("moved");
+    // playButton.addEventListener("click", makeMove, false);
+	makeSingleMove(row, col, color);
     // randomMove(1);
     // console.log(isGameOver());
 	if (isGameOver()) {
@@ -984,6 +1018,21 @@ function setupNavigationButtons() {
     fastForward.classList.add("inactive");
 }
 
+function setupMode() {
+    if (MODE === 0) {
+        const addButton = document.getElementById("add-button");
+        const whyButton = document.getElementById("why-button");
+        addButton.classList.add("inactive");
+        whyButton.classList.add("inactive");
+        const addBlock = document.createElement("div");
+        addBlock.classList.add("specificity-menu-blocker");
+        addButton.append(addBlock);
+        const whyBlock = document.createElement("div");
+        whyBlock.classList.add("specificity-menu-blocker");
+        whyButton.append(whyBlock);
+    }
+}
+
 /* Main */
 
 function main() {
@@ -999,7 +1048,8 @@ function main() {
     // gameButton.addEventListener("click", (e) => {
     //     gameFileInput.click();
     // });
-    document.getElementById("moves").addEventListener("scroll", scrollGameHistory, true);
+    document.getElementById("moves").addEventListener("scroll", scrollGameHistory, false);
+    document.getElementById("mode-ball").addEventListener("click", changeGameMode, false);
     // setupNavigationButtons();
 }
 

@@ -42,7 +42,7 @@
             <div class="explanation-container">
                 <div id="buttons-container" class="buttons-container">
                     <div id="add-button" class="add-button" onclick="addPattern()">Offer Advice</div>
-                    <div class="why-button" onclick="explain()">Get Explanation</div>
+                    <div id="why-button" class="why-button" onclick="explain()">Get Explanation</div>
                 </div>
                 <div id="uploads-container" class="uploads-container">
                     <input type="file" id="policy-file"/>
@@ -51,52 +51,64 @@
                     <!-- <div id="game-button" class="upload-button">Upload Game</div> -->
                     <div id="download-button" class="upload-button" onclick="downloadPolicy()">Save Policy</div>
                 </div>
-                <div class="game-navigation-container">
-                    <div class="game-up-down-load-container">
-                        <div class="game-load-container">
-                            Load <i class="fa fa-upload"></i>
-                        </div>
-                        <div class="game-load-container">
-                            Save <i class="fa fa-download"></i>
-                        </div>
-                        <div class="game-load-container" onclick="reset()">
-                            New  <i class="fa fa-arrow-circle-o-right"></i>
-                        </div>
-                    </div>
-                    <div class="game-history-container">
-                        <div id="move-numbers" class="move-number-container">
-                            
-                        </div>
-                        <div id="moves" class="moves-container">
-                            <div id="pending-black-moves" class="moves-col">
-
+                <div class="game-stuff-container">
+                    <div class="game-navigation-container">
+                        <div class="game-up-down-load-container">
+                            <div class="game-load-container">
+                                Load <i class="fa fa-upload"></i>
                             </div>
-                            <div id="black-moves" class="moves-col">
-
+                            <div class="game-load-container">
+                                Save <i class="fa fa-download"></i>
                             </div>
-                            <div id="pending-white-moves" class="moves-col">
-
+                            <div class="game-load-container" onclick="reset()">
+                                New  <i class="fa fa-arrow-circle-o-right"></i>
                             </div>
-                            <div id="white-moves" class="moves-col">
+                        </div>
+                        <div class="game-history-container">
+                            <div id="move-numbers" class="move-number-container">
                                 
                             </div>
+                            <div id="moves" class="moves-container">
+                                <div id="pending-black-moves" class="moves-col">
+
+                                </div>
+                                <div id="black-moves" class="moves-col">
+
+                                </div>
+                                <div id="pending-white-moves" class="moves-col">
+
+                                </div>
+                                <div id="white-moves" class="moves-col">
+                                    
+                                </div>
+                            </div>
+                        </div>
+                        <div class="game-navbar-container">
+                            <div id="fast-backward" class="navigation-button inactive">
+                                <i class="fa fa-fast-backward"></i>
+                            </div>
+                            <div id="step-backward" class="navigation-button inactive">
+                                <i class="fa fa-step-backward"></i>
+                            </div>
+                            <div id="play-pause" class="navigation-button inactive">
+                                <i class="fa fa-play"></i>
+                            </div>
+                            <div id="step-forward" class="navigation-button inactive">
+                                <i class="fa fa-step-forward"></i>
+                            </div>
+                            <div id="fast-forward" class="navigation-button inactive">
+                                <i class="fa fa-fast-forward"></i>
+                            </div>
                         </div>
                     </div>
-                    <div class="game-navbar-container">
-                        <div id="fast-backward" class="navigation-button inactive">
-                            <i class="fa fa-fast-backward"></i>
-                        </div>
-                        <div id="step-backward" class="navigation-button inactive">
-                            <i class="fa fa-step-backward"></i>
-                        </div>
-                        <div id="play-pause" class="navigation-button inactive">
-                            <i class="fa fa-play"></i>
-                        </div>
-                        <div id="step-forward" class="navigation-button inactive">
-                            <i class="fa fa-step-forward"></i>
-                        </div>
-                        <div id="fast-forward" class="navigation-button inactive">
-                            <i class="fa fa-fast-forward"></i>
+                    <div class="game-settings-container">
+                        <div id="mode-setting-container" class="setting-container">
+                            <div class="setting-text">
+                                Audit mode:
+                            </div>
+                            <div id="mode-switch" class="switch">
+                                <div id="mode-ball" class="switch-ball"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
