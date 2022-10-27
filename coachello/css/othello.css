@@ -257,6 +257,10 @@ li.literal + li.literal {
     background-color: rgba(199, 75, 80, 1);
 }
 
+.flip-highlighted {
+    background-color: rgba(60, 164, 60, 1.0);
+}
+
 .border-cell {
     background-color: #1f5a5b;
     width: 50px;

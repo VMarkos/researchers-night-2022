@@ -11,6 +11,7 @@ let ALL_DIRECTIONS = [
     [-1, -1], [-1, 0], [-1, 1],
 ];
 let PLAYING = false;
+let PAUSED = false;
 let EMPTY_CELLS;
 let NO_LEGAL_MOVES = false;
 let TEMP_BOARD = undefined;
@@ -34,7 +35,8 @@ const highlightEvent = new Event("highlight");
         cell: [row, col],
         color: 1|-1,
         board: BOARD,
-        legalMove: LEGAL_MOVES,
+        legalMoves: LEGAL_MOVES,
+        explanation: EXPLANATION,
     },
     ...
 ]
@@ -61,7 +63,7 @@ const TEST_LITERAL_DICT = {
     "move": (x, y) => {return `move to (${x + 1}, ${y + 1})`;},
 };
 
-function initializeBoard() {
+function initializeBoard(withLegalMoves = true) {
     document.getElementById("blacks").innerText = 2;
     document.getElementById("whites").innerText = 2;
     EMPTY_CELLS = N_ROWS * N_COLS - 4;
@@ -89,8 +91,10 @@ function initializeBoard() {
         }
     }
     setUpPosition(boardContainer);
-    calculateLegalMoves();
-    drawLegalMoves();
+    if (withLegalMoves) {
+        calculateLegalMoves();
+        drawLegalMoves();
+    }
 }
 
 function drawBoard(board) {
@@ -279,11 +283,16 @@ function updateGameHistory(row, col, color) {
     for (const brow of BOARD) {
         copyBoard.push([...brow]);
     }
+    if (typeof row === "string" || typeof col === "string") {
+        console.log(row, col, color);
+    }
     CURRENT_GAME.push({
         cell: [row, col],
         color: color,
         board: copyBoard,
         legalMoves: [...LEGAL_MOVES],
+        toBeFlipped: TO_BE_FLIPPED,
+        explanation: EXPLANATION,
     });
     currentMove = CURRENT_GAME.length;
     canMoveBackward = true;
@@ -403,11 +412,11 @@ function randomMove(color = -1) {
 function makeDoubleMove(row, col, color = -1) {
     if (!PLAYING) {
         PLAYING = true;
-        const modeSetting = document.getElementById("mode-setting-container");
-        modeSetting.classList.add("inactive");
-        const blocker = document.createElement("div");
-        blocker.classList.add("specification-menu-blocker");
-        modeSetting.append(blocker);
+        // const modeSetting = document.getElementById("mode-setting-container");
+        // modeSetting.classList.add("inactive");
+        // const blocker = document.createElement("div");
+        // blocker.classList.add("specification-menu-blocker");
+        // modeSetting.append(blocker);
         setupMode();
         if (MODE === 1) { // TODO This should be changed, since no moves should be played in audit mode.
             const stepBackward = document.getElementById("step-backward");
@@ -466,6 +475,9 @@ function previousMove(casualCall = true) {
         const fastForward = document.getElementById("fast-forward");
         fastForward.classList.remove("inactive");
         fastForward.addEventListener("click", forwardFast, false);
+        const playPause = document.getElementById("play-pause");
+        playPause.classList.remove("inactive");
+        playPause.addEventListener("click", autoplay, false);
     }
     const lastDot = document.getElementById("last-dot");
     // console.log("Is casual call?", casualCall);
@@ -485,6 +497,7 @@ function previousMove(casualCall = true) {
     }
     BOARD = thisMove["board"];
     drawBoard(thisMove["board"]);
+    console.log(boardToString(BOARD));
     eraseLegalMoves();
     drawLegalMoves(color, false, thisMove["legalMoves"]);
     updateScore(color, ...countStones(thisMove["board"]));
@@ -506,16 +519,38 @@ function previousMove(casualCall = true) {
         col = prevMove["cell"][1];
         color = prevMove["color"];
         if (row > -1 && col > -1) {
+            console.log("xy:", row, col);
             const cell = document.getElementById("oc-" + row + "-" + col);
             const piece = cell.firstChild;
             const redDot = document.createElement("div");
             redDot.id = "last-move";
             redDot.classList.add("othello-last-move");
-            piece.append(redDot);
+            // try {
+                piece.append(redDot);
+            // } catch (e) {
+            //     console.log(boardToString(BOARD));
+            // }
         }
     }
     updateScore(color, ...countStones(thisMove["board"]));
     return true;
+}
+
+function boardToString(board) {
+    let boardString = "";
+    for (const row of board) {
+        for (const x of row) {
+            if (x === 1) {
+                boardString += "O ";
+            } else if (x === -1) {
+                boardString += "* ";
+            } else {
+                boardString += ". ";
+            }
+        }
+        boardString += "\n";
+    }
+    return boardString;
 }
 
 function countStones(board) {
@@ -533,7 +568,6 @@ function countStones(board) {
 }
 
 function backwardFast(existsPreviousMove = true, moveCount = 65, cell = undefined, casualCall = true) {
-    // console.log("backward-fast");
     if (existsPreviousMove && moveCount > 0) {
         existsPreviousMove = previousMove(casualCall);
         moveCount--
@@ -568,6 +602,7 @@ function nextMove(casualCall = true) {
         highlightedCell = "";
     }
     currentMove++;
+    console.log(currentMove);
     updateMoveSpan();
     let prevMove, row, col, color;
     prevMove = CURRENT_GAME[currentMove - 1];
@@ -590,6 +625,9 @@ function nextMove(casualCall = true) {
         const stepForward = document.getElementById("step-forward");
         stepForward.classList.add("inactive");
         stepForward.removeEventListener("click", nextMove, false);
+        const playPause = document.getElementById("play-pause");
+        playPause.classList.add("inactive");
+        playPause.removeEventListener("click", autoplay, false);
         value = false;
     } else {
         const thisMove = CURRENT_GAME[currentMove];
@@ -701,6 +739,10 @@ function appendMoveToGameHistory(row, col, color) {
 function goToPendingMove(event) {
     if (highlightedCell) {
         document.getElementById(highlightedCell).classList.remove("highlighted");
+        // const toBeUnflipped = document.getElementsByClassName("flip-highlighted"); // FIXME You are fixing this.
+        // for (const cell of toBeUnflipped) {
+        //     cell.classList.remove("flip-highlighted");
+        // }
     }
     const targetSpan = event.currentTarget;
     console.log(targetSpan);
@@ -717,7 +759,10 @@ function goToPendingMove(event) {
     const moveNumber = parseInt(targetSpan.getAttribute("data-move-number"));
     let currentMoveNumber = currentMove;
     const cell = document.getElementById("oc-" + CURRENT_GAME[moveNumber - 1]["cell"].join("-"));
-    cell.addEventListener("highlight", highlightPendingCell, false);
+    cell.addEventListener("highlight", (event) => {
+        const toBeFlipped = CURRENT_GAME[moveNumber - 1]["toBeFlipped"]["oc-" + CURRENT_GAME[moveNumber - 1]["cell"].join("-")];
+        highlightPendingCell(event, toBeFlipped);
+    }, false);
     removeLastDot = false;
     if (moveNumber < currentMoveNumber) {
         backwardFast(true, currentMoveNumber - moveNumber + 1, cell, false);
@@ -726,10 +771,13 @@ function goToPendingMove(event) {
     }
 }
 
-function highlightPendingCell(event) {
+function highlightPendingCell(event, toBeFlipped) {
     event.target.classList.add("highlighted");
     event.target.removeEventListener("highlight", highlightPendingCell, false);
     highlightedCell = event.target.id;
+    // for (const cellId of toBeFlipped) { // FIXME You are here as well.
+    //     document.getElementById(cellId).classList.add("flip-highlighted");
+    // }
 }
 
 function goToMove(event) {
@@ -758,11 +806,12 @@ function changeGameMode() {
 }
 
 function translateMove(row, col, color) {
-    if (row === -1 || col === -1) {
+    const iRow = parseInt(row), iCol = parseInt(col);
+    if (iRow === -1 || iCol === -1) {
         return "PS";
     }
     const cols = ["A", "B", "C", "D", "E", "F", "G", "H"];
-    return `${color === -1 ? cols[col].toLowerCase() : cols[col]}${row + 1}`;
+    return `${color === -1 ? cols[iCol].toLowerCase() : cols[col]}${iRow + 1}`;
 }
 
 function scrollGameHistory() {
@@ -1033,6 +1082,125 @@ function setupMode() {
     }
 }
 
+function prepareGameforDownload() {
+    console.log(boardToString(CURRENT_GAME[CURRENT_GAME.length - 1]["board"]));
+    console.log(boardToString(BOARD));
+    return {
+        game: CURRENT_GAME,
+        policy: preparePolicyForDownload(),
+        lastBoard: BOARD,
+        lastLegalMoves: [...LEGAL_MOVES],
+    }
+}
+
+function downloadGame() {
+    console.log("download");
+    const preparedGame = prepareGameforDownload();
+    download("game.json", JSON.stringify(preparedGame, null, 2));
+}
+
+function loadGameHistory() {
+    let cell, color;
+    console.log(CURRENT_GAME.length);
+    currentMove = 0
+    for (const move of CURRENT_GAME) {
+        currentMove++;
+        cell = move["cell"];
+        color = move["color"];
+        appendMoveToGameHistory(...cell, color);
+    }
+    // backwardFast();
+    BOARD = TEMP_BOARD;
+    PLAYING = false;
+    const board = document.getElementById("board-container");
+    board.innerHTML = "";
+    // EXPLANATION = {}; // Is this needed?
+    // downloadPolicy();
+    coachedPolicyString = "";
+    // currentMove = undefined;
+    initializeBoard(false);
+    drawLegalMoves(-1, true, ["oc-2-3", "oc-3-2", "oc-4-5", "oc-5-4"]);
+    const previousSpan = document.getElementById("last-move-span");
+    if (previousSpan) {
+        previousSpan.classList.remove("last-move-span");
+        previousSpan.id = "";
+    }
+    canMoveForward = true;
+    currentMove = 0;
+    const stepForward = document.getElementById("step-forward");
+    stepForward.classList.remove("inactive");
+    stepForward.addEventListener("click", nextMove, false);
+    const fastForward = document.getElementById("fast-forward");
+    fastForward.classList.remove("inactive");
+    fastForward.addEventListener("click", forwardFast, false);
+    const playPause = document.getElementById("play-pause");
+    playPause.classList.remove("inactive");
+    playPause.addEventListener("click", autoplay, false);
+}
+
+function autoplay(existsMove = true, firstPress = true) {
+    const playPause = document.getElementById("play-pause");
+    playPause.removeEventListener("click", autoplay, false);
+    if (firstPress) {
+        for (const child of playPause.children) {
+            child.remove();
+        }
+        const pause = document.createElement("i");
+        pause.classList.add("fa");
+        pause.classList.add("fa-pause");
+        playPause.append(pause);
+        playPause.addEventListener("click", pauseGame, false);
+    }
+    if (existsMove && !PAUSED) {
+        existsMove = nextMove();
+        setTimeout(() => {autoplay(existsMove, false);}, 1000);
+    }
+    if (!existsMove || PAUSED) {
+        for (const child of playPause.children) {
+            child.remove();
+        }
+        const play = document.createElement("i");
+        play.classList.add("fa");
+        play.classList.add("fa-play");
+        playPause.append(play);
+        if (PAUSED) {
+            PAUSED = false;
+            console.log("Paused:", PAUSED);
+            playPause.removeEventListener("click", pauseGame, false);
+            playPause.addEventListener("click", autoplay, false);
+        }
+    }
+}
+
+function pauseGame() {
+    PAUSED = true;
+}
+
+function loadGame() {
+    const reader = new FileReader();
+    let gameJSON, policyJSON, ball;//, modeSetting, blocker;
+    reader.onload = (() => {
+        ball = document.getElementById("mode-ball");
+        ball.click();
+        // modeSetting = document.getElementById("mode-setting-container");
+        // modeSetting.classList.add("inactive");
+        // blocker = document.createElement("div");
+        // blocker.classList.add("specification-menu-blocker");
+        // modeSetting.append(blocker);
+        gameJSON = JSON.parse(reader.result);
+        CURRENT_GAME = gameJSON.game;
+        TEMP_BOARD = gameJSON.lastBoard;
+        LEGAL_MOVES = gameJSON.lastLegalMoves;
+        loadGameHistory();
+        policyJSON = gameJSON.policy;
+        N_RULES = policyJSON.nRules;
+        TEST_POLICY = policyJSON.policy;
+        RULE_MAP_JSON = policyJSON.ruleMap;
+        loadRuleMap();
+    });
+    reader.readAsText(this.files[0]);
+}
+
 /* Main */
 
 function main() {
@@ -1040,17 +1208,21 @@ function main() {
     const policyFileInput = document.getElementById("policy-file");
     const gameFileInput = document.getElementById("game-file");
     const policyButton = document.getElementById("policy-button");
-    const gameButton = document.getElementById("game-button");
+    const gameButton = document.getElementById("game-load-button");
     policyFileInput.addEventListener("change", uploadPolicy, false);
     policyButton.addEventListener("click", (e) => {
         policyFileInput.click();
     });
-    // gameButton.addEventListener("click", (e) => {
-    //     gameFileInput.click();
-    // });
+    gameFileInput.addEventListener("change", loadGame, false);
+    gameButton.addEventListener("click", (e) => {
+        gameFileInput.click();
+    });
     document.getElementById("moves").addEventListener("scroll", scrollGameHistory, false);
     document.getElementById("mode-ball").addEventListener("click", changeGameMode, false);
-    // setupNavigationButtons();
+    const modeSetting = document.getElementById("mode-setting-container");
+    const blocker = document.createElement("div");
+    blocker.classList.add("specification-menu-blocker");
+    modeSetting.append(blocker);
 }
 
 window.addEventListener("load", main);

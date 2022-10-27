@@ -46,7 +46,6 @@
                 </div>
                 <div id="uploads-container" class="uploads-container">
                     <input type="file" id="policy-file"/>
-                    <!-- <input type="file" id="game-file"/> -->
                     <div id="policy-button" class="upload-button">Load Policy</div>
                     <!-- <div id="game-button" class="upload-button">Upload Game</div> -->
                     <div id="download-button" class="upload-button" onclick="downloadPolicy()">Save Policy</div>
@@ -54,10 +53,11 @@
                 <div class="game-stuff-container">
                     <div class="game-navigation-container">
                         <div class="game-up-down-load-container">
-                            <div class="game-load-container">
+                            <input type="file" id="game-file"/>
+                            <div id="game-load-button" class="game-load-container">
                                 Load <i class="fa fa-upload"></i>
                             </div>
-                            <div class="game-load-container">
+                            <div class="game-load-container" onclick="downloadGame()">
                                 Save <i class="fa fa-download"></i>
                             </div>
                             <div class="game-load-container" onclick="reset()">
@@ -102,7 +102,7 @@
                         </div>
                     </div>
                     <div class="game-settings-container">
-                        <div id="mode-setting-container" class="setting-container">
+                        <div id="mode-setting-container" class="setting-container inactive">
                             <div class="setting-text">
                                 Audit mode:
                             </div>
