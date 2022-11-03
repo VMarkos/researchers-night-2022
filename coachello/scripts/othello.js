@@ -15,8 +15,9 @@ let PAUSED = false;
 let EMPTY_CELLS;
 let NO_LEGAL_MOVES = false;
 let TEMP_BOARD = undefined;
-let MACHINE_COLOR = 1;
-let MODE = 0; // 0 = playing, 1 = auditing.
+let BLACK = 0; // 0 = human, 1 = Prudens, 2 = Edax.
+let WHITE = 1; // 0 = human, 1 = Prudens, 2 = Edax.
+let MODE = -1; // -1 = undefined, 0 = playing, 1 = auditing.
 
 let EXPLANATION = {};
 
@@ -28,6 +29,8 @@ let canMoveForward = false, canMoveBackward = false;
 let highlightedCell = "";
 
 const highlightEvent = new Event("highlight");
+
+const PLAYER_OPTIONS = ["Human", "Prudens"];
 
 /* Current Game Structure:
 [
@@ -130,7 +133,7 @@ function drawLegalMoves(color = -1, interactive = true, legalMoves = undefined) 
         cellContainer = document.getElementById(cellId);
         legalMove = document.createElement("div");
         legalMove.classList.add("legal-moves-black");
-        if (color === -1 && interactive) {
+        if (color === -1 && interactive && MODE === 0) {
             legalMove.addEventListener("mouseup", () => {
                 removeExplanationBorders();
                 // console.log("Interactive!");
@@ -292,7 +295,7 @@ function updateGameHistory(row, col, color) {
         board: copyBoard,
         legalMoves: [...LEGAL_MOVES],
         toBeFlipped: TO_BE_FLIPPED,
-        explanation: EXPLANATION,
+        explanation: EXPLANATION === {} ? undefined : EXPLANATION,
     });
     currentMove = CURRENT_GAME.length;
     canMoveBackward = true;
@@ -412,20 +415,27 @@ function randomMove(color = -1) {
 function makeDoubleMove(row, col, color = -1) {
     if (!PLAYING) {
         PLAYING = true;
+        const settings = document.getElementById("game-settings-container");
+        settings.style.opacity = 0.6;
+        const blocker = document.createElement("div");
+        blocker.classList.add("blocker");
+        blocker.classList.add("transparent");
+        blocker.classList.add("rounded-corners");
+        settings.append(blocker);
         // const modeSetting = document.getElementById("mode-setting-container");
         // modeSetting.classList.add("inactive");
         // const blocker = document.createElement("div");
         // blocker.classList.add("specification-menu-blocker");
         // modeSetting.append(blocker);
-        setupMode();
-        if (MODE === 1) { // TODO This should be changed, since no moves should be played in audit mode.
-            const stepBackward = document.getElementById("step-backward");
-            stepBackward.addEventListener("click", previousMove, false);
-            stepBackward.classList.remove("inactive");
-            const fastBackward = document.getElementById("fast-backward");
-            fastBackward.addEventListener("click", backwardFast, false);
-            fastBackward.classList.remove("inactive");
-        }
+        // setupMode();
+        // if (MODE === 1) { // TODO This should be changed, since no moves should be played in audit mode.
+        //     const stepBackward = document.getElementById("step-backward");
+        //     stepBackward.addEventListener("click", previousMove, false);
+        //     stepBackward.classList.remove("inactive");
+        //     const fastBackward = document.getElementById("fast-backward");
+        //     fastBackward.addEventListener("click", backwardFast, false);
+        //     fastBackward.classList.remove("inactive");
+        // }
     }
     // const explanationContainer = document.getElementById("explanation-text");
     // explanationContainer.innerHTML = "";
@@ -634,6 +644,11 @@ function nextMove(casualCall = true) {
         BOARD = thisMove["board"];
         drawBoard(thisMove["board"]);
         drawLegalMoves(color, false, thisMove["legalMoves"]);
+        if (prevMove["explanation"] === {}) {
+            EXPLANATION = prevMove["explanation"];
+            console.log(EXPLANATION);
+            explain();
+        }
         value = true;
     }
     if (row > -1 && col > -1) {
@@ -824,8 +839,12 @@ function resetGameHistory() {
     const blackMoves = document.getElementById("black-moves");
     const whiteMoves = document.getElementById("white-moves");
     const moveNums = document.getElementById("move-numbers");
+    const pendingBM = document.getElementById("pending-black-moves");
+    const pendingWM = document.getElementById("pending-white-moves");
     blackMoves.innerHTML = "";
     whiteMoves.innerHTML = "";
+    pendingBM.innerHTML = "";
+    pendingWM.innerHTML = "";
     moveNums.innerHTML = "";
 }
 
@@ -1083,8 +1102,8 @@ function setupMode() {
 }
 
 function prepareGameforDownload() {
-    console.log(boardToString(CURRENT_GAME[CURRENT_GAME.length - 1]["board"]));
-    console.log(boardToString(BOARD));
+    // console.log(boardToString(CURRENT_GAME[CURRENT_GAME.length - 1]["board"]));
+    // console.log(boardToString(BOARD));
     return {
         game: CURRENT_GAME,
         policy: preparePolicyForDownload(),
@@ -1201,28 +1220,447 @@ function loadGame() {
     reader.readAsText(this.files[0]);
 }
 
+function enterPlayMode() {
+    if (MODE === -1) {
+        MODE = 0;
+        const initButtonsContainer = document.getElementById("init-buttons-container");
+        initButtonsContainer.style.transform = "translate(-50%, 0)";
+        initButtonsContainer.style.top = "0";
+        showPlayModeSettings();
+        eraseLegalMoves();
+        drawLegalMoves();
+    } else if (MODE === 0) {
+        const isNonEmpty = currentMove !== undefined && currentMove > 0;
+        const newGame = confirm(`${isNonEmpty ? "Save game and s" : "S"}tart new game?`);
+        if (newGame) {
+            if (isNonEmpty) {
+                downloadGame();
+            }
+            resetGame();
+        }
+    } else if (MODE === 1) {
+        const isNonEmpty = coachedPolicyString !== "";
+        const audit = confirm(`${isNonEmpty ? "Save policy and s" : "S"}tart a new game?`);
+        if (audit) {
+            MODE = 0;
+            if (isNonEmpty) {
+                downloadPolicy();
+            }
+            resetGame();
+            const auditContainer = document.getElementById("audit-container");
+            auditContainer.style.top = "-100vh";
+            setTimeout(() => {
+                auditContainer.remove();
+            }, 250);
+            showPlayModeSettings();
+        }
+    }
+}
+
+function resetGame() {
+    PLAYING = false;
+    const gameSettingsContainer = document.getElementById("game-settings-container");
+    if (gameSettingsContainer) {
+        gameSettingsContainer.style.opacity = 1.0;
+        for (const child of gameSettingsContainer.childNodes) {
+            if (child.classList.contains("blocker")) {
+                child.remove();
+            }
+        }
+    }
+    const board = document.getElementById("board-container");
+    board.innerHTML = "";
+    currentMove = undefined;
+    CURRENT_GAME = [];
+    resetGameHistory();
+    initializeBoard();
+}
+
+function showPlayModeSettings() {
+    const rightMenuContainer = document.getElementById("right-menu-container");
+    const gameSettingsContainer = document.createElement("div");
+    gameSettingsContainer.classList.add("game-settings-container");
+    gameSettingsContainer.id = "game-settings-container";
+    const blackSettings = setupPlayerSettings("black");
+    const whiteSettings = setupPlayerSettings("white", {right: true});
+    gameSettingsContainer.append(blackSettings);
+    gameSettingsContainer.append(whiteSettings);
+    const gh = getGameHistory();
+    const saveGame = getSaveGameButton();
+    const gameNavContainer = document.createElement("div");
+    gameNavContainer.classList.add("game-navigation-container");
+    gameNavContainer.append(saveGame);
+    gameNavContainer.append(gh);
+    // const gNav = generateGameNav();
+    const hiddenDownContainer = document.createElement("div");
+    hiddenDownContainer.classList.add("show-play-mode");
+    hiddenDownContainer.id = "play-game-container";
+    hiddenDownContainer.append(gameSettingsContainer);
+    hiddenDownContainer.append(gameNavContainer);
+    // hiddenDownContainer.append(gNav);
+    rightMenuContainer.append(hiddenDownContainer);
+    setTimeout(() => {
+    	hiddenDownContainer.style.top = "80px";
+    }, 10);
+//	hiddenDownContainer.style.transform = "none";
+}
+
+function getSaveGameButton() {
+    const container = document.createElement("div");
+    container.classList.add("game-up-down-load-container");
+    const button = document.createElement("div");
+    button.classList.add("game-load-container");
+    button.addEventListener("click", downloadGame, false);
+    button.append(document.createTextNode("Save "));
+    const icon = document.createElement("i");
+    icon.classList.add("fa");
+    icon.classList.add("fa-download");
+    button.append(icon);
+    container.append(button);
+    return container;
+}
+
+function getGameHistory() {
+	const gameHistoryContainer = document.createElement("div");
+	gameHistoryContainer.classList.add("game-history-container");
+	const moveNumContainer = document.createElement("div");
+	moveNumContainer.classList.add("move-number-container");
+	const movesContainer = document.createElement("div");
+	movesContainer.classList.add("moves-container");
+	const pendingBM = document.createElement("div");
+	const bm = document.createElement("div");
+	const pendingWM = document.createElement("div");
+	const wm = document.createElement("div");
+	moveNumContainer.id = "move-numbers";
+	movesContainer.id = "moves";
+    movesContainer.addEventListener("scroll", scrollGameHistory, false);
+	pendingBM.classList.add("moves-col");
+	pendingBM.id = "pending-black-moves";
+	bm.classList.add("moves-col");
+	bm.id = "black-moves";
+	pendingWM.classList.add("moves-col");
+	pendingWM.id = "pending-white-moves";
+	wm.classList.add("moves-col");
+	wm.id = "white-moves";
+	movesContainer.append(pendingBM);
+	movesContainer.append(bm);
+	movesContainer.append(pendingWM);
+	movesContainer.append(wm);
+	gameHistoryContainer.append(moveNumContainer);
+	gameHistoryContainer.append(movesContainer);
+	return gameHistoryContainer;
+}
+
+function generateGameNav() {
+	const navContainer = document.createElement("div");
+	navContainer.classList.add("game-navbar-container");
+	const items = ["fast-backward", "step-backward", "play", "step-forward", "fast-forward"];
+	let e, ei;
+	for (const x of items) {
+		e = document.createElement("div");
+		e.id = x === "play" ? x + "-pause" : x;
+		e.classList.add("navigation-button");
+		e.classList.add("inactive");
+		ei = document.createElement("i");
+		ei.classList.add("fa");
+		ei.classList.add("fa-" + x);
+		e.append(ei);
+		navContainer.append(e);
+	}
+	return navContainer;
+}
+
+function setupPlayerSettings(color, params = {
+    right: false,
+    defaultPlayers: {
+        black: "Human",
+        white: "Prudens",
+    },
+}) {
+    if (params.defaultPlayers === undefined) {
+        params.defaultPlayers = {
+            black: "Human",
+            white: "Prudens",
+        };
+    }
+    const settings = document.createElement("div");
+    settings.classList.add("player-settings");
+    if (params["right"]) {
+        settings.classList.add("right");
+    }
+    const colorLabel = document.createElement("div");
+    const playerColor = document.createElement("div");
+    colorLabel.innerHTML = "<b>Color</b>:";
+    playerColor.innerText = color[0].toUpperCase() + color.slice(1);
+    const playerLabel = document.createElement("div");
+    const playerType = document.createElement("div");
+    playerLabel.innerHTML = "<b>Player</b>:";
+    playerType.classList.add("player-type-container");
+    playerType.innerText = params.defaultPlayers[color];
+    const downArrow = document.createElement("div");
+    downArrow.classList.add("fa");
+    downArrow.classList.add("fa-angle-down");
+    playerType.append(downArrow);
+    playerType.id = color + "-type";
+    const dropdown = playerTypeDropdown(color);
+    playerType.append(dropdown);
+    const particularsLabel = document.createElement("div");
+    const particulars = document.createElement("input");
+    const particularsButton = document.createElement("div");
+    particularsLabel.innerHTML = "<b>Policy</b>:";
+	particularsLabel.id = color + "-particulars-label";
+	particulars.type = "file";
+	particulars.addEventListener("change", uploadPolicy, false);
+	particulars.id = color + "-particulars";
+	particularsButton.innerText = "Upload...";
+	particularsButton.id = color + "-policy-button";
+    if (params.defaultPlayers[color] !== "Prudens") {
+    	particularsLabel.classList.add("inactive");
+		particularsButton.classList.add("inactive");
+    } else {
+    	particularsButton.classList.add("policy-upload-button");
+    	particularsButton.tempFunc = () => {particulars.click();};
+		particularsButton.addEventListener("click", particularsButton.tempFunc, false);
+    }
+    settings.append(colorLabel);
+    settings.append(playerColor);
+    settings.append(playerLabel);
+    settings.append(playerType);
+    settings.append(particularsLabel);
+    settings.append(particulars);
+    settings.append(particularsButton);
+    return settings;
+}
+
+function playerTypeDropdown(color) {
+    const dropdown = document.createElement("div");
+    dropdown.classList.add("player-dropdown-container");
+    const dropdownUl = document.createElement("ul");
+    let option;
+    for (let i = 0; i < PLAYER_OPTIONS.length; i++) {
+        option = PLAYER_OPTIONS[i];
+        const li = document.createElement("li");
+        li.id = color + "-" + option.toLowerCase();
+        li.innerText = option;
+        li.addEventListener("click", (event) => {
+            if (color === "white") {
+                WHITE = i;
+            } else {
+                BLACK = i;
+            }
+            const ggParent = event.target.parentElement.parentElement.parentElement;
+            for (const child of ggParent.childNodes) {
+            	if (child.nodeType === 3) {
+            		child.remove();
+            	}
+            }
+            const newTextNode = document.createTextNode(PLAYER_OPTIONS[i]);
+            ggParent.append(newTextNode);
+            if (i === 1) {
+            	const label = document.getElementById(color + "-particulars-label");
+            	const button = document.getElementById(color + "-policy-button");
+            	label.classList.remove("inactive");
+            	button.classList.remove("inactive");
+            	button.classList.add("policy-upload-button");
+            	activatePolicyUpload(color);
+            } else if (i === 0) {
+            	const label = document.getElementById(color + "-particulars-label");
+            	const button = document.getElementById(color + "-policy-button");
+            	if (!label.classList.contains("inactive")) {
+	            	label.classList.add("inactive");	
+            	}
+            	if (!button.classList.contains("inactive")) {
+					button.classList.add("inactive");            	
+            	}
+            	button.classList.remove("policy-upload-button");
+            	button.removeEventListener("click", button.tempFunc, false);
+            }
+        }, false)
+        dropdownUl.append(li);
+    }
+    dropdown.append(dropdownUl);
+    return dropdown;
+}
+
+function activatePolicyUpload(color) {
+	const inputElement = document.getElementById(color + "-particulars");
+	const policyButton = document.getElementById(color + "-policy-button");
+	policyButton.tempFunc = () => {inputElement.click();};
+	policyButton.addEventListener("click", policyButton.tempFunc, false);
+}
+
+function enterAuditMode() {
+    if (MODE === -1) {
+        MODE = 1;
+        const initButtonsContainer = document.getElementById("init-buttons-container");
+        initButtonsContainer.style.transform = "translate(-50%, 0)";
+        initButtonsContainer.style.top = "0";
+        showAuditModeSettings();
+    } else if (MODE === 0) {
+        const isNonEmpty = currentMove !== undefined && currentMove > 0;
+        const audit = confirm(`${isNonEmpty ? "Save game and p" : "P"}roceed to audit mode?`);
+        if (audit) {
+            MODE = 1;
+            if (isNonEmpty) {
+                downloadGame();
+            }
+            resetAudit();
+            const gameContainer = document.getElementById("play-game-container");
+            gameContainer.style.top = "-100vh";
+            setTimeout(() => {
+                gameContainer.remove();
+            }, 250);
+            showAuditModeSettings();
+        }
+    } else if (MODE === 1) {
+        const isNonEmpty = coachedPolicyString !== "";
+        const audit = confirm(`${isNonEmpty ? "Save policy and r" : "R"}estart auditing?`);
+        if (audit) {
+            if (isNonEmpty) {
+                downloadPolicy();
+            }
+            resetAudit();
+        }
+    }
+}
+
+function resetAudit() {
+    PLAYING = false;
+    const board = document.getElementById("board-container");
+    board.innerHTML = "";
+    currentMove = undefined;
+    EXPLANATION = {};
+    CURRENT_GAME = [];
+    resetGameHistory();
+    initializeBoard();
+}
+
+function showAuditModeSettings() {
+    const rightMenuContainer = document.getElementById("right-menu-container");
+    const gameSettingsContainer = getAuditSettings();
+    const gh = getGameHistory();
+    const gameHeader = getGameHeader();
+    const gameNavContainer = document.createElement("div");
+    gameNavContainer.classList.add("game-navigation-container");
+    gameNavContainer.append(gameHeader);
+    gameNavContainer.append(gh);
+    const gNav = generateGameNav();
+    gameNavContainer.append(gNav);
+    const hiddenDownContainer = document.createElement("div");
+    hiddenDownContainer.classList.add("show-play-mode");
+    hiddenDownContainer.id = "audit-container";
+    hiddenDownContainer.append(gameSettingsContainer);
+    hiddenDownContainer.append(gameNavContainer);
+    // hiddenDownContainer.append(gNav);
+    rightMenuContainer.append(hiddenDownContainer);
+    setTimeout(() => {
+    	hiddenDownContainer.style.top = "80px";
+    }, 10);
+}
+
+function getAuditSettings() {
+    const container = document.createElement("div");
+    container.classList.add("game-settings-container");
+    container.classList.add("audit-settings-container");
+    const gameUploadLabel = document.createElement("div");
+    gameUploadLabel.innerHTML = "<b>Current Game</b>:";
+    const gameUploadButton = document.createElement("div");
+    gameUploadButton.classList.add("policy-upload-button");
+    gameUploadButton.innerText = "Upload...";
+    const gameUploadInput = document.createElement("input");
+    gameUploadInput.type = "file";
+    gameUploadButton.addEventListener("click", () => {gameUploadInput.click()}, false);
+    gameUploadInput.addEventListener("change", loadGame, false);
+    const gameUploadContainer = document.createElement("div");
+    gameUploadContainer.classList.add("game-upload-container");
+    gameUploadContainer.append(gameUploadLabel);
+    gameUploadContainer.append(gameUploadInput);
+    gameUploadContainer.append(gameUploadButton);
+    container.append(gameUploadContainer);
+    container.append(getAuditPlayerSettings("black"));
+    container.append(getAuditPlayerSettings("white", {right: true}));
+    return container;
+}
+
+function getAuditPlayerSettings(color, params = {
+    right: false,
+}) {
+    const settings = document.createElement("div");
+    settings.classList.add("player-settings");
+    if (params["right"]) {
+        settings.classList.add("right");
+    }
+    const colorLabel = document.createElement("div");
+    const playerColor = document.createElement("div");
+    colorLabel.innerHTML = "<b>Color</b>:";
+    playerColor.innerText = color[0].toUpperCase() + color.slice(1);
+    const playerLabel = document.createElement("div");
+    const playerType = document.createElement("div");
+    playerLabel.innerHTML = "<b>Player</b>:";
+    playerType.classList.add("player-type-container");
+    playerType.innerText = "??";
+    playerType.id = color + "-type";
+    const particularsLabel = document.createElement("div");
+    const particularsButton = document.createElement("div");
+    particularsLabel.innerHTML = "<b>Policy</b>:";
+	particularsLabel.id = color + "-particulars-label";
+	particularsButton.innerText = "??";
+	particularsButton.id = color + "-policy-button";
+    settings.append(colorLabel);
+    settings.append(playerColor);
+    settings.append(playerLabel);
+    settings.append(playerType);
+    settings.append(particularsLabel);
+    settings.append(particularsButton);
+    return settings;
+}
+
+function getGameHeader() {
+    const container = document.createElement("div");
+    container.classList.add("game-up-down-load-container");
+    const button = document.createElement("div");
+    button.classList.add("game-load-container");
+    button.addEventListener("click", downloadPolicy, false);
+    button.append(document.createTextNode("Save "));
+    const icon = document.createElement("i");
+    icon.classList.add("fa");
+    icon.classList.add("fa-download");
+    button.append(icon);
+    container.append(button);
+    const advise = document.createElement("div");
+    advise.classList.add("game-load-container");
+    advise.addEventListener("click", addPattern, false);
+    advise.append(document.createTextNode("Offer advice "));
+    const offerIcon = document.createElement("i");
+    offerIcon.classList.add("fa");
+    offerIcon.classList.add("fa-plus-square");
+    advise.append(offerIcon);
+    container.append(advise);
+    return container;
+}
+
 /* Main */
 
 function main() {
     initializeBoard();
-    const policyFileInput = document.getElementById("policy-file");
-    const gameFileInput = document.getElementById("game-file");
-    const policyButton = document.getElementById("policy-button");
-    const gameButton = document.getElementById("game-load-button");
-    policyFileInput.addEventListener("change", uploadPolicy, false);
-    policyButton.addEventListener("click", (e) => {
-        policyFileInput.click();
-    });
-    gameFileInput.addEventListener("change", loadGame, false);
-    gameButton.addEventListener("click", (e) => {
-        gameFileInput.click();
-    });
-    document.getElementById("moves").addEventListener("scroll", scrollGameHistory, false);
-    document.getElementById("mode-ball").addEventListener("click", changeGameMode, false);
-    const modeSetting = document.getElementById("mode-setting-container");
-    const blocker = document.createElement("div");
-    blocker.classList.add("specification-menu-blocker");
-    modeSetting.append(blocker);
+    // const policyFileInput = document.getElementById("policy-file");
+    // const gameFileInput = document.getElementById("game-file");
+    // const policyButton = document.getElementById("policy-button");
+    // const gameButton = document.getElementById("game-load-button");
+    // policyFileInput.addEventListener("change", uploadPolicy, false);
+    // policyButton.addEventListener("click", (e) => {
+    //     policyFileInput.click();
+    // });
+    // gameFileInput.addEventListener("change", loadGame, false);
+    // gameButton.addEventListener("click", (e) => {
+    //     gameFileInput.click();
+    // });
+    // document.getElementById("moves").addEventListener("scroll", scrollGameHistory, false);
+    // document.getElementById("mode-ball").addEventListener("click", changeGameMode, false);
+    // const modeSetting = document.getElementById("mode-setting-container");
+    // const blocker = document.createElement("div");
+    // blocker.classList.add("specification-menu-blocker");
+    // modeSetting.append(blocker);
 }
 
 window.addEventListener("load", main);

@@ -39,15 +39,19 @@
                     
                 </div>
             </div>
-            <div class="explanation-container">
-                <div id="buttons-container" class="buttons-container">
+            <div id="right-menu-container" class="explanation-container">
+                <div id="init-buttons-container" class="init-buttons-container">
+                    <div id="play-button" class="init-button play" onclick="enterPlayMode()">Play</div>
+                    <div id="audit-button" class="init-button audit" onclick="enterAuditMode()">Audit</div>
+                </div>
+                <!-- <div id="buttons-container" class="buttons-container">
                     <div id="add-button" class="add-button" onclick="addPattern()">Offer Advice</div>
                     <div id="why-button" class="why-button" onclick="explain()">Get Explanation</div>
                 </div>
                 <div id="uploads-container" class="uploads-container">
                     <input type="file" id="policy-file"/>
                     <div id="policy-button" class="upload-button">Load Policy</div>
-                    <!-- <div id="game-button" class="upload-button">Upload Game</div> -->
+                    <div id="game-button" class="upload-button">Upload Game</div>
                     <div id="download-button" class="upload-button" onclick="downloadPolicy()">Save Policy</div>
                 </div>
                 <div class="game-stuff-container">
@@ -110,18 +114,26 @@
                                 <div id="mode-ball" class="switch-ball"></div>
                             </div>
                         </div>
+                        <div id="explanation-setting-container" class="setting-container inactive">
+                            <div class="setting-text">
+                                Explain:
+                            </div>
+                            <div id="explanation-switch" class="switch">
+                                <div id="explanation-ball" class="switch-ball"></div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </div> -->
                 <!-- <div id="explanation-text" class="explanation-text">
 
                 </div> -->
-                <div id="info-container" class="footer-container">
-                    <!-- <div class="tour-container" onclick="startTour()">
-                        Take a Tour!
-                    </div> -->
-                    <div class="help-container">
-                        <a href="https://en.wikipedia.org/wiki/Reversi" target="_blank"><i class="fa fa-info-circle fa-2x"></i></a>
-                    </div>
+            </div>
+            <div id="info-container" class="footer-container">
+                <!-- <div class="tour-container" onclick="startTour()">
+                    Take a Tour!
+                </div> -->
+                <div class="help-container">
+                    <a href="https://en.wikipedia.org/wiki/Reversi" target="_blank"><i class="fa fa-info-circle fa-2x"></i></a>
                 </div>
             </div>
         </div>
