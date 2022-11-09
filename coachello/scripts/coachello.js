@@ -1,7 +1,7 @@
 const PATTERN = new Array(N_ROWS + 1); // 0 empty, 1 red (body), 2 blue (positive head), 3 bordeaux? (negative head).
 const PATTERN_SEMANTICS = new Array(N_ROWS + 1);
 let RULE_MAP = new Map();
-let RULE_MAP_JSON = {};
+let RULE_MAP_JSON = [{}, {}]; // 0 = white, 1 = black.
 let basePatterns = [];
 let existsHead = false;
 let N_RULES = 0;
@@ -28,7 +28,7 @@ const LABELS = {
 
 let alreadyFlipped = false;
 
-let coachedPolicyString = "";
+let coachedPolicyStrings = ["", ""];
 
 const D4 = [ // Dihedral group (n=4). Contains the 7 non-trivial transforms of D4 (3 rotations and 4 reflections).
     (x, y) => {return [x, 7 - y];}, // Reflection wrt to x = 0.
@@ -225,10 +225,10 @@ function transpileToFn(pattern, ruleName) {
             z = 0;
         }
         ruleTransforms.push((a, b) => {return [x + a, y + b];});
-        if (RULE_MAP_JSON[ruleName]) {
-            RULE_MAP_JSON[ruleName].push([x, y, z]);
+        if (RULE_MAP_JSON[CURRENT_PLAYER][ruleName]) {
+            RULE_MAP_JSON[CURRENT_PLAYER][ruleName].push([x, y, z]);
         } else {
-            RULE_MAP_JSON[ruleName] = [[x, y, z]];
+            RULE_MAP_JSON[CURRENT_PLAYER][ruleName] = [[x, y, z]];
         }
     }
     return ruleTransforms;
@@ -245,7 +245,7 @@ function updatePolicy() {
             N_RULES++;
         }
     }
-    coachedPolicyString += policyString;
+    coachedPolicyStrings += policyString;
 }
 
 function removeHighlights() {
@@ -295,22 +295,10 @@ function removePatternCells() {
     }
 }
 
-function uploadPolicy() {
-    const reader = new FileReader();
-    reader.onload = (() => {
-        policyJSON = JSON.parse(reader.result);
-        N_RULES = policyJSON.nRules;
-        TEST_POLICY = policyJSON.policy;
-        RULE_MAP_JSON = policyJSON.ruleMap;
-        loadRuleMap();
-    });
-    reader.readAsText(this.files[0]);
-}
-
 function loadRuleMap() {
     let rulePoints, ruleTransforms;
-    for (const rule in RULE_MAP_JSON) {
-        rulePoints = RULE_MAP_JSON[rule];
+    for (const rule in RULE_MAP_JSON[CURRENT_PLAYER]) {
+        rulePoints = RULE_MAP_JSON[CURRENT_PLAYER][rule];
         ruleTransforms = [];
         for (const point of rulePoints) {
             // console.log(point);
@@ -326,7 +314,7 @@ function loadRuleMap() {
 }
 
 function downloadPolicy() {
-    const policyJSON = preparePolicyForDownload();
+    const policyJSON = preparePoliciesForDownload(); // TODO Redefine this function for a single policy!
     download("policy.json", JSON.stringify(policyJSON, null, 2));
 }
 
@@ -340,10 +328,14 @@ function download(filename, content) {
     document.body.removeChild(element);
 }
 
-function preparePolicyForDownload() {
+function preparePoliciesForDownload() {
     const policyJSON = {
+        policiesId: "pps" + Date.now(),
         nRules: N_RULES,
-        policy: (TEST_POLICY[0] === "@" ? "" : "@Knowledge") + TEST_POLICY + "\n" + coachedPolicyString,
+        policies: [
+            `${POLICIES[0][0] === "@" ? "" : "@Knowledge"}${POLICIES[0]}\n${coachedPolicyStrings[0]}`,
+            `${POLICIES[1][0] === "@" ? "" : "@Knowledge"}${POLICIES[1]}\n${coachedPolicyStrings[1]}`,
+        ],
         ruleMap: RULE_MAP_JSON,
     };
     return policyJSON;

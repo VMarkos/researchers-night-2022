@@ -18,6 +18,17 @@ let TEMP_BOARD = undefined;
 let BLACK = 0; // 0 = human, 1 = Prudens, 2 = Edax.
 let WHITE = 1; // 0 = human, 1 = Prudens, 2 = Edax.
 let MODE = -1; // -1 = undefined, 0 = playing, 1 = auditing.
+let BLACK_TIMEOUT = 500;
+let WHITE_TIMEOUT = 500;
+let ANIMATED = true;
+let BULK_GAMES_NUM = 1;
+let BULK_GAMES_CURRENT = 0;
+let BULK_GAMES = [];
+let CURRENT_PLAYER = 1; // 0 = white, 1 = black;
+
+const SCORE = [2, 2];
+
+let gameOverCounter = 0;
 
 let EXPLANATION = {};
 
@@ -31,6 +42,8 @@ let highlightedCell = "";
 const highlightEvent = new Event("highlight");
 
 const PLAYER_OPTIONS = ["Human", "Prudens"];
+
+let FINALIZED_SETTINGS = false;
 
 /* Current Game Structure:
 [
@@ -48,7 +61,9 @@ const PLAYER_OPTIONS = ["Human", "Prudens"];
 // TEST_POLICY = `@Knowledge
 // RME :: legalMove(X,Y), cell(X+1,Y,-1), cell(X+2,Y,1) implies move(X,Y);`
 
-let TEST_POLICY = "";
+const POLICIES = [{}, {}];
+
+// let TEST_POLICY = "";
 
 const TEST_DICT = {
     "D1": "Play any legal move available, resolving ties at random.",
@@ -121,31 +136,78 @@ function drawBoard(board) {
     }
 }
 
+function addBlocker(e, params = {blockerStyle: [], id: ""}) {
+    const defParams = {
+        blockerStyle: [],
+        id: "",
+    };
+    for (const key in params) {
+        if (params[key] === undefined) {
+            params[key] = defParams[key];
+        }
+    }
+    const blocker = document.createElement("div");
+    if (!e.style.position === "relative") {
+        e.style.position = "relative";
+    }
+    blocker.classList.add("blocker");
+    let i = 0;
+    while (i < params.blockerStyle.length) {
+        blocker.classList.add(params.blockerStyle[i]);
+        i++;
+    }
+    if (params.id) {
+        blocker.id = params.id;
+    }
+    e.append(blocker);
+}
+
 function drawLegalMoves(color = -1, interactive = true, legalMoves = undefined) {
     if (legalMoves === undefined) {
         legalMoves = LEGAL_MOVES;
     }
     let cellContainer, legalMove, coords, row, col;
-    // console.log("Drawing:");
+    let isHumanPlayer;
     for (const cellId of legalMoves) {
-        // console.log(cellId);
-        // debugger;
         cellContainer = document.getElementById(cellId);
         legalMove = document.createElement("div");
         legalMove.classList.add("legal-moves-black");
-        if (color === -1 && interactive && MODE === 0) {
-            legalMove.addEventListener("mouseup", () => {
-                removeExplanationBorders();
-                // console.log("Interactive!");
-                coords = cellId.split("-");
-                row = parseInt(coords[1]);
-                col = parseInt(coords[2]);
-                makeDoubleMove(row, col);
-            });
-        } else {
-            legalMove.style.cursor = "auto";
-        }
+        legalMove.addEventListener("mouseup", () => {
+            removeExplanationBorders();
+            coords = cellId.split("-");
+            row = parseInt(coords[1]);
+            col = parseInt(coords[2]);
+            if (BLACK + WHITE > 0) { // If not both are human players...
+                makeDoubleMove(row, col, color);
+            } else {
+                makeSingleMove(row, col, color);
+            }
+        });
+        isHumanPlayer = (WHITE === 0 && color === 1) || (BLACK === 0 && color === -1);
+        // if (WHITE * BLACK === 0 && interactive && MODE === 0 && isHumanPlayer) {
+        //     console.log("adding event listeners");
+        //     // console.trace();
+        //     legalMove.addEventListener("mouseup", () => {
+        //         removeExplanationBorders();
+        //         coords = cellId.split("-");
+        //         row = parseInt(coords[1]);
+        //         col = parseInt(coords[2]);
+        //         if (BLACK + WHITE > 0) { // If not both are human players...
+        //             makeDoubleMove(row, col, color);
+        //         } else {
+        //             makeSingleMove(row, col, color);
+        //         }
+        //     });
+        // } else {
+        //     console.log("Cursor: auto");
+        //     console.log(WHITE, BLACK, color);
+        //     console.trace();
+        //     legalMove.style.cursor = "auto";
+        // }
         cellContainer.append(legalMove);
+        if (WHITE * BLACK !== 0 || !interactive || MODE !== 0 || !isHumanPlayer) {
+            addBlocker(cellContainer, params = {blockerStyle: ["transparent"], id: cellId + "-blocker"});
+        }
         // console.log("appended");
     }
 }
@@ -161,9 +223,6 @@ function eraseLegalMoves() {
 }
 
 function flipPieces(cellIds = undefined) {
-    // if (TO_BE_FLIPPED[LAST_MOVE] === undefined) {
-    //     return;
-    // }
     let coords, currentPiece, row, col;
     // console.log("TO_BE_FLIPPED:", TO_BE_FLIPPED);
     // console.log("LAST_MOVE:", LAST_MOVE);
@@ -175,20 +234,23 @@ function flipPieces(cellIds = undefined) {
     }
     // console.log("inFlip:", cellIds);
     for (const cellId of cellIds) {
-        // currentPiece = document.getElementById(cellId).lastChild;
-        currentPiece = document.getElementById(cellId).firstChild;
-        // console.log("cellId:", cellId);
+        if (ANIMATED) {
+            currentPiece = document.getElementById(cellId).firstChild;
+        }
         coords = cellId.split("-");
         row = coords[1];
         col = coords[2];
-        // console.log("row:", row, "col:", col);
         if (BOARD[row][col] === -1) {
-            currentPiece.classList.remove("othello-piece-black");
-            currentPiece.classList.add("othello-piece-white");
+            if (ANIMATED) {
+                currentPiece.classList.remove("othello-piece-black");
+                currentPiece.classList.add("othello-piece-white");
+            }
             BOARD[row][col] = 1;
         } else {
-            currentPiece.classList.remove("othello-piece-white");
-            currentPiece.classList.add("othello-piece-black");
+            if (ANIMATED) {
+                currentPiece.classList.remove("othello-piece-white");
+                currentPiece.classList.add("othello-piece-black");
+            }
             BOARD[row][col] = -1;
         }
     }
@@ -287,7 +349,7 @@ function updateGameHistory(row, col, color) {
         copyBoard.push([...brow]);
     }
     if (typeof row === "string" || typeof col === "string") {
-        console.log(row, col, color);
+        // console.log(row, col, color);
     }
     CURRENT_GAME.push({
         cell: [row, col],
@@ -299,62 +361,92 @@ function updateGameHistory(row, col, color) {
     });
     currentMove = CURRENT_GAME.length;
     canMoveBackward = true;
-    appendMoveToGameHistory(row, col, color);
+    if (ANIMATED) {
+        appendMoveToGameHistory(row, col, color);
+    }
 }
 
 function makeSingleMove(row, col, color = -1) {
-    updateGameHistory(row, col, color);
-    const lastMoveDot = document.getElementById("last-move");
-    if (lastMoveDot) {
-        lastMoveDot.remove();
+    CURRENT_PLAYER = (color + 1) / 2;
+    if (!PLAYING) {
+        PLAYING = true;
+        finalizeSettings();
+        // const settings = document.getElementById("game-settings-container");
+        // settings.style.opacity = 0.6;
+        // const blocker = document.createElement("div");
+        // blocker.classList.add("blocker");
+        // blocker.classList.add("transparent");
+        // blocker.classList.add("rounded-corners");
+        // settings.append(blocker);
+        // const saveGameButton = document.getElementById("save-game-button");
+        // saveGameButton.classList.remove("inactive");
+        // saveGameButton.addEventListener("click", downloadGame, false);
     }
-    eraseLegalMoves();
-    const pieceClass = `othello-piece-${color === 1 ? "white" : "black"}`;
-    const cell = document.getElementById("oc-" + row + "-" + col);
-    const piece = document.createElement("div");
-    const redDot = document.createElement("div");
-    redDot.id = "last-move";
-    redDot.classList.add("othello-last-move");
-    piece.append(redDot);
-    piece.classList.add(pieceClass);
-    cell.append(piece);
+    updateGameHistory(row, col, color);
+    if (ANIMATED) {
+        const lastMoveDot = document.getElementById("last-move");
+        if (lastMoveDot) {
+            lastMoveDot.remove();
+        }
+        eraseLegalMoves();
+        const pieceClass = `othello-piece-${color === 1 ? "white" : "black"}`;
+        const cell = document.getElementById("oc-" + row + "-" + col);
+        const piece = document.createElement("div");
+        const redDot = document.createElement("div");
+        redDot.id = "last-move";
+        redDot.classList.add("othello-last-move");
+        piece.append(redDot);
+        piece.classList.add(pieceClass);
+        cell.append(piece);
+    }
     BOARD[row][col] = color;
     LAST_MOVE = "oc-" + row + "-" + col;
     flipPieces();
     updateScore(color);
     calculateLegalMoves(color);
-    drawLegalMoves((-1) * color);
+    if (ANIMATED) {
+        drawLegalMoves((-1) * color);
+    }
     EMPTY_CELLS -= 1;
 }
 
 function updateScore(color, blacks = undefined, whites = undefined) {
+    // if (ANIMATED) {
     const blacksElement = document.getElementById("blacks");
     const whitesElement = document.getElementById("whites");
+    // }
     let flipped, oldBlacks, oldWhites;
     if (blacks === undefined || whites === undefined) {
         flipped = TO_BE_FLIPPED[LAST_MOVE].length;
-        oldBlacks = parseInt(blacksElement.innerText);
-        oldWhites = parseInt(whitesElement.innerText);
+        oldBlacks = SCORE[0];
+        oldWhites = SCORE[1];
     }
     if (color === 1) {
         if (blacks === undefined || whites === undefined) {
             blacks = oldBlacks - flipped;
             whites = oldWhites + flipped + 1;
         }
-        blacksElement.innerText = blacks;
-        whitesElement.innerText = whites;
+        SCORE[0] = blacks;
+        SCORE[1] = whites;
+        if (ANIMATED) {
+            blacksElement.innerText = SCORE[0];
+            whitesElement.innerText = SCORE[1];
+        }
     } else {
         if (blacks === undefined || whites === undefined) {
             blacks = oldBlacks + flipped +1;
             whites = oldWhites - flipped;
         }
-        blacksElement.innerText = blacks;
-        whitesElement.innerText = whites;
+        SCORE[0] = blacks;
+        SCORE[1] = whites;
+        if (ANIMATED) {
+            blacksElement.innerText = SCORE[0];
+            whitesElement.innerText = SCORE[1];
+        }
     }
 }
 
 function updateLastMove(cellId) {
-	// const cell = document.getElementById(cellId);
 	if (LAST_MOVE) {
         const coords = LAST_MOVE.split("-");
         const row = coords[1];
@@ -362,7 +454,8 @@ function updateLastMove(cellId) {
         if (BOARD[row][col] === 1) {
             const previousCell = document.getElementById(LAST_MOVE);
             const previousPiece = previousCell.lastChild;
-            // console.log(previousPiece);
+            // console.log("PP:", previousPiece, "last move:", LAST_MOVE);
+            // console.log(boardToString(BOARD));
             previousPiece.removeChild(previousPiece.lastChild);
         }
 	}
@@ -370,7 +463,7 @@ function updateLastMove(cellId) {
 }
 
 function isGameOver() {
-    return EMPTY_CELLS === 0;
+    return EMPTY_CELLS === 0 || gameOverCounter === 2;
 }
 
 /* Agents */
@@ -385,27 +478,10 @@ function randomMove(color = -1) {
 		col = Math.floor(N_COLS * Math.random());
 	} while (!LEGAL_MOVES.includes("oc-" + row + "-" + col));
 	const cellId = "oc-" + row + "-" + col;
-	updateLastMove(cellId);
+    if (ANIMATED) {
+        updateLastMove(cellId);
+    }
     makeSingleMove(row, col, color);
-    // if (color === MACHINE_COLOR) {
-    //     const playButton = document.getElementById("play-pause");
-    //     playButton.classList.remove("inactive");
-    //     const cell = document.getElementById(cellId);
-    //     cell.classList.add("highlighted");
-    //     highlightedCell = cellId;
-    //     const makeMove = () => {
-    //         makeSingleMove(row, col, color);
-    //         // const playButton = document.getElementById("play-pause");
-    //         playButton.removeEventListener("click", makeMove, false);
-    //         playButton.classList.add("inactive");
-    //         cell.classList.remove("highlighted");
-    //         highlightedCell = "";
-    //     };
-    //     console.log("moved randomly");
-    //     playButton.addEventListener("click", makeMove, false);
-    // } else {
-    //     makeSingleMove(row, col, color);
-    // }
 	if (isGameOver()) {
 		return 1;
 	}
@@ -413,43 +489,19 @@ function randomMove(color = -1) {
 }
 
 function makeDoubleMove(row, col, color = -1) {
+    if (!FINALIZED_SETTINGS) {
+        finalizeSettings();
+    }
     if (!PLAYING) {
         PLAYING = true;
-        const settings = document.getElementById("game-settings-container");
-        settings.style.opacity = 0.6;
-        const blocker = document.createElement("div");
-        blocker.classList.add("blocker");
-        blocker.classList.add("transparent");
-        blocker.classList.add("rounded-corners");
-        settings.append(blocker);
-        // const modeSetting = document.getElementById("mode-setting-container");
-        // modeSetting.classList.add("inactive");
-        // const blocker = document.createElement("div");
-        // blocker.classList.add("specification-menu-blocker");
-        // modeSetting.append(blocker);
-        // setupMode();
-        // if (MODE === 1) { // TODO This should be changed, since no moves should be played in audit mode.
-        //     const stepBackward = document.getElementById("step-backward");
-        //     stepBackward.addEventListener("click", previousMove, false);
-        //     stepBackward.classList.remove("inactive");
-        //     const fastBackward = document.getElementById("fast-backward");
-        //     fastBackward.addEventListener("click", backwardFast, false);
-        //     fastBackward.classList.remove("inactive");
-        // }
+        const saveGameButton = document.getElementById("save-game-button");
+        saveGameButton.classList.remove("inactive");
+        saveGameButton.addEventListener("click", downloadGame, false);
     }
-    // const explanationContainer = document.getElementById("explanation-text");
-    // explanationContainer.innerHTML = "";
-    let gameOverCounter = 0;
     if (LEGAL_MOVES.length > 0) {
-        // CURRENT_GAME.push({
-        //     cell: [row, col],
-        //     color: color,
-        //     flipped: TO_BE_FLIPPED["oc-" + row + "-" + col],
-        // });
         makeSingleMove(row, col, color);
         gameOverCounter = 0;
     } else {
-        // console.log("NO LEGAL MOVES (human)");
         updateGameHistory(-1, -1, color);
         calculateLegalMoves(color);
         drawLegalMoves((-1) * color);
@@ -459,13 +511,12 @@ function makeDoubleMove(row, col, color = -1) {
         return;
     }
     if (LEGAL_MOVES.length > 0) {
-        console.log("waiting");
+        const timeOut = color === 1 ? BLACK_TIMEOUT: WHITE_TIMEOUT;
         setTimeout(() => {
             const move = prudensMove((-1) * color);
-        }, 500);
+        }, timeOut);
         gameOverCounter = 0;
     } else {
-        // console.log("NO LEGAL MOVES (Prudens)");
         updateGameHistory(-1, -1, (-1) * color);
         calculateLegalMoves((-1) * color);
         drawLegalMoves(color);
@@ -474,6 +525,32 @@ function makeDoubleMove(row, col, color = -1) {
     if (gameOverCounter === 2) {
         return;
     }
+}
+
+function prudensAutoplay(color) {
+    if (!PLAYING) {
+        PLAYING = true;
+        const saveGameButton = document.getElementById("save-game-button");
+        saveGameButton.classList.remove("inactive");
+        saveGameButton.addEventListener("click", downloadGame, false);
+    }
+    return new Promise((resolve) => {
+        const timeOut = color === 1 ? WHITE_TIMEOUT : BLACK_TIMEOUT;
+        setTimeout(() => {
+            if (LEGAL_MOVES.length > 0) {
+                const move = prudensMove(color);
+                gameOverCounter = 0;
+            } else {
+                updateGameHistory(-1, -1, (-1) * color);
+                calculateLegalMoves((-1) * color);
+                if (ANIMATED) {
+                    drawLegalMoves(color);
+                }
+                gameOverCounter++;
+            }
+            resolve();
+        }, timeOut);
+    });
 }
 
 function previousMove(casualCall = true) {
@@ -490,7 +567,6 @@ function previousMove(casualCall = true) {
         playPause.addEventListener("click", autoplay, false);
     }
     const lastDot = document.getElementById("last-dot");
-    // console.log("Is casual call?", casualCall);
     if (lastDot && casualCall) {
         lastDot.id = "";
         lastDot.classList.remove("fa-dot-circle-o");
@@ -507,14 +583,11 @@ function previousMove(casualCall = true) {
     }
     BOARD = thisMove["board"];
     drawBoard(thisMove["board"]);
-    console.log(boardToString(BOARD));
     eraseLegalMoves();
     drawLegalMoves(color, false, thisMove["legalMoves"]);
     updateScore(color, ...countStones(thisMove["board"]));
     if (currentMove === 0) {
         canMoveBackward = false;
-        // console.log(canMoveForward, canMoveBackward);
-        // console.log("In");
         const fastBackward = document.getElementById("fast-backward");
         fastBackward.classList.add("inactive");
         fastBackward.removeEventListener("click", backwardFast, false);
@@ -529,7 +602,7 @@ function previousMove(casualCall = true) {
         col = prevMove["cell"][1];
         color = prevMove["color"];
         if (row > -1 && col > -1) {
-            console.log("xy:", row, col);
+            // console.log("xy:", row, col);
             const cell = document.getElementById("oc-" + row + "-" + col);
             const piece = cell.firstChild;
             const redDot = document.createElement("div");
@@ -584,7 +657,6 @@ function backwardFast(existsPreviousMove = true, moveCount = 65, cell = undefine
         setTimeout(() => {backwardFast(existsPreviousMove, moveCount, cell, casualCall);}, 50);
     }
     if (!existsPreviousMove) {
-        // console.log("removed bf:", moveCount);
         const fastBackward = document.getElementById("fast-backward");
         fastBackward.removeEventListener("click", backwardFast, false);
     }
@@ -612,7 +684,7 @@ function nextMove(casualCall = true) {
         highlightedCell = "";
     }
     currentMove++;
-    console.log(currentMove);
+    // console.log(currentMove);
     updateMoveSpan();
     let prevMove, row, col, color;
     prevMove = CURRENT_GAME[currentMove - 1];
@@ -646,7 +718,7 @@ function nextMove(casualCall = true) {
         drawLegalMoves(color, false, thisMove["legalMoves"]);
         if (prevMove["explanation"] === {}) {
             EXPLANATION = prevMove["explanation"];
-            console.log(EXPLANATION);
+            // console.log(EXPLANATION);
             explain();
         }
         value = true;
@@ -696,8 +768,6 @@ function updateMoveSpan(moveCols = 2) {
     }
     if (currentMove !== 0) {
         const targetSpan = document.getElementsByClassName("move-span")[index];
-        // console.log("spans:", document.getElementsByClassName("move-span"));
-        // console.log("index:", index);
         targetSpan.classList.add("last-move-span");
         targetSpan.id = "last-move-span";
         targetSpan.scrollIntoView();
@@ -760,7 +830,7 @@ function goToPendingMove(event) {
         // }
     }
     const targetSpan = event.currentTarget;
-    console.log(targetSpan);
+    // console.log(targetSpan);
     const emptyDot = targetSpan.firstChild;
     const lastDot = document.getElementById("last-dot");
     if (lastDot) {
@@ -878,48 +948,27 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
 			suggestedMoves.push(literal.trim());
 		}
 	}
-    // console.log(suggestedMoves);
 	if (suggestedMoves.length === 0) {
-        // randomMove();
 		return randomMove(color);
 	}
-	// const moveLiteral = suggestedMoves[Math.floor(suggestedMoves.length * Math.random())].trim();
     const moveLiteral = suggestedMoves.pop().trim();
     generateExplanation(moveLiteral, output);
-    // generateContrastiveExplanation(moveLiteral, output);
-    // console.log("moveLiteral:", moveLiteral);
 	const coords = moveLiteral.substring(5, moveLiteral.length - 1).split(",");
 	const row = coords[0].trim();
 	const col = coords[1].trim();
 	const cellId = "oc-" + row + "-" + col;
-	updateLastMove(cellId);
+    if (ANIMATED) {
+        updateLastMove(cellId);
+    }
     if (TO_BE_FLIPPED[LAST_MOVE] === undefined) {
         EXPLANATION.flipped = [];
     } else {
         EXPLANATION.flipped = [...TO_BE_FLIPPED[LAST_MOVE]];
     }
 	if (!LEGAL_MOVES.includes(cellId)) { // Need to throw exception at this point.
-        // console.log("Not legal:", LEGAL_MOVES, cellId);
 		return -1;
 	}
-    // const playButton = document.getElementById("play-pause");
-    // playButton.classList.remove("inactive");
-    // const cell = document.getElementById(cellId);
-    // cell.classList.add("highlighted");
-    // highlightedCell = cellId;
-    // const makeMove = () => {
-    //     makeSingleMove(row, col, color);
-    //     const playButton = document.getElementById("play-pause");
-    //     playButton.removeEventListener("click", makeMove, false);
-    //     playButton.classList.add("inactive");
-    //     cell.classList.remove("highlighted");
-    //     highlightedCell = "";
-    // };
-    // console.log("moved");
-    // playButton.addEventListener("click", makeMove, false);
 	makeSingleMove(row, col, color);
-    // randomMove(1);
-    // console.log(isGameOver());
 	if (isGameOver()) {
 		return 1;
 	}
@@ -927,21 +976,28 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
 }
 
 function otDeduce() {
-  const kbObject = otKbParser();
-  if (kbObject["type"] === "error") {
-      return "ERROR: " + kbObject["name"] + ":\n" + kbObject["message"];
-  }
-  const warnings = kbObject["warnings"];
-  const contextObject = otContextParser();
-  if (contextObject["type"] === "error") {
-      return "ERROR: " + contextObject["name"] + ":\n" + contextObject["message"];
-  }
-  const output = forwardChaining(kbObject, contextObject["context"]);
-  const inferences = output["facts"];
-  return {
-    output: output,
-    inferences: contextToString(inferences)
-  }
+    // console.log(CURRENT_PLAYER);
+    const kbObject = POLICIES[CURRENT_PLAYER]["json"];
+    if (kbObject === undefined) {
+        return {
+            output: undefined,
+            inferences: "",
+        };
+    }
+    if (kbObject["type"] === "error") {
+        return "ERROR: " + kbObject["name"] + ":\n" + kbObject["message"];
+    }
+    const contextObject = otContextParser();
+    if (contextObject["type"] === "error") {
+        return "ERROR: " + contextObject["name"] + ":\n" + contextObject["message"];
+    }
+    const output = forwardChaining(kbObject, contextObject["context"]);
+    const inferences = output["facts"];
+    // console.log(inferences);
+    return {
+        output: output,
+        inferences: contextToString(inferences)
+    }
 }
 
 function otKbParser() {
@@ -1016,7 +1072,7 @@ function generateExplanation(inference, output) {
     const rule = crownRules.pop();
     const ruleName = rule.name;
     // const ruleTransforms = RULE_MAP.get(ruleName);
-    const rulePoints = RULE_MAP_JSON[ruleName];
+    const rulePoints = RULE_MAP_JSON[CURRENT_PLAYER][ruleName];
     // console.log("rt:", ruleTransforms);
     for (const point of rulePoints) {
         EXPLANATION.body.push([point[0] + row, point[1] + col]);
@@ -1102,25 +1158,56 @@ function setupMode() {
 }
 
 function prepareGameforDownload() {
-    // console.log(boardToString(CURRENT_GAME[CURRENT_GAME.length - 1]["board"]));
-    // console.log(boardToString(BOARD));
+    let gameId = `${BLACK === 0 ? "h" : "p"}${WHITE === 0 ? "h" : "p"}_${Date.now()}`; // TODO Maybe add policy id?
     return {
+        gameId: gameId,
         game: CURRENT_GAME,
-        policy: preparePolicyForDownload(),
+        policies: preparePoliciesForDownload(),
         lastBoard: BOARD,
         lastLegalMoves: [...LEGAL_MOVES],
     }
 }
 
 function downloadGame() {
-    console.log("download");
+    // console.log("download");
     const preparedGame = prepareGameforDownload();
     download("game.json", JSON.stringify(preparedGame, null, 2));
 }
 
+function uploadPolicy(files, player) {
+    const reader = new FileReader();
+    reader.onload = (() => {
+        // console.log("Loaded");
+        const policyJSON = JSON.parse(reader.result);
+        N_RULES = policyJSON.nRules;
+        POLICIES[player] = {
+            text: policyJSON.policy,
+            json: parseKB(policyJSON.policy),
+        }
+        RULE_MAP_JSON[player] = policyJSON.ruleMap;
+        // console.log(player);
+        const policyButton = document.getElementById(`${player === 0 ? "white" : "black"}-policy-button`);
+        // console.log(policyButton);
+        for (const child of policyButton.childNodes) {
+            if (child.nodeType === Node.TEXT_NODE) {
+                let filename = files[0].name;
+                policyButton.title = filename;
+                if (filename.length > 16) {
+                    filename = filename.substring(0,4) + "..." + filename.substring(filename.length - 9, filename.length - 5);
+                }
+                child.textContent = filename;
+            }
+        }
+        loadRuleMap();
+    });
+    // console.log("here");
+    // console.log(this.files);
+    reader.readAsText(files[0]);
+}
+
 function loadGameHistory() {
     let cell, color;
-    console.log(CURRENT_GAME.length);
+    // console.log(CURRENT_GAME.length);
     currentMove = 0
     for (const move of CURRENT_GAME) {
         currentMove++;
@@ -1184,7 +1271,7 @@ function autoplay(existsMove = true, firstPress = true) {
         playPause.append(play);
         if (PAUSED) {
             PAUSED = false;
-            console.log("Paused:", PAUSED);
+            // console.log("Paused:", PAUSED);
             playPause.removeEventListener("click", pauseGame, false);
             playPause.addEventListener("click", autoplay, false);
         }
@@ -1261,19 +1348,156 @@ function resetGame() {
     PLAYING = false;
     const gameSettingsContainer = document.getElementById("game-settings-container");
     if (gameSettingsContainer) {
-        gameSettingsContainer.style.opacity = 1.0;
+        // gameSettingsContainer.style.opacity = 1.0;
         for (const child of gameSettingsContainer.childNodes) {
             if (child.classList.contains("blocker")) {
                 child.remove();
             }
+        }
+        const doneButton = document.getElementById("done-button");
+        if (doneButton.firstChild.classList.contains("fa-refresh")) {
+            doneButton.firstChild.classList.remove("fa-refresh");
+            doneButton.firstChild.classList.add("fa-check");
+            doneButton.removeEventListener("click", resetSettings, false);
+            doneButton.removeEventListener("click", finalizeSettings, false);
+            FINALIZED_SETTINGS = false;
         }
     }
     const board = document.getElementById("board-container");
     board.innerHTML = "";
     currentMove = undefined;
     CURRENT_GAME = [];
+    SCORE[0] = 2;
+    SCORE[1] = 2;
     resetGameHistory();
     initializeBoard();
+}
+
+function resetSettings() {
+    const reSettings = confirm("Save game and reset?");
+    if (reSettings) {
+        downloadGame();
+        resetGame();
+        const doneButton = document.getElementById("done-button");
+        doneButton.removeEventListener("click", resetSettings, false);
+        doneButton.addEventListener("click", finalizeSettings, false);
+    }
+}
+
+function finalizeSettings() { // TODO Add event so as to track whether settings have changed and ask user to restart game, save etc.
+    // TODO (cont'd) You need to generate a SETTINGS object where you store all settings, like, who plays, what type of player, type particulars etc.
+    ANIMATED = document.getElementById("animate").checked;
+    if (!FINALIZED_SETTINGS) {
+        if (ANIMATED) {
+            const settings = document.getElementById("game-settings-container");
+            const blocker = document.createElement("div");
+            blocker.classList.add("blocker", "rounded-corners");
+            blocker.id = "settings-blocker";
+            settings.append(blocker);
+            const doneButton = document.getElementById("done-button");
+            doneButton.firstChild.classList.remove("fa-check");
+            doneButton.firstChild.classList.add("fa-refresh");
+            doneButton.removeEventListener("click", finalizeSettings, false);
+            doneButton.addEventListener("click", resetSettings, false);
+            FINALIZED_SETTINGS = true;
+        }
+        updateSettings();
+    } else {
+        const blocker = document.getElementById("settings-blocker");
+        blocker.remove();
+        const doneButton = document.getElementById("done-button");
+        doneButton.firstChild.classList.remove("fa-refresh");
+        doneButton.firstChild.classList.add("fa-check");
+        FINALIZED_SETTINGS = false;
+    }
+}
+
+function updateSettings() {
+    if (WHITE === 1) {
+        WHITE_TIMEOUT = parseInt(document.getElementById("white-timeout-input").value);
+        // console.log("In:", WHITE_TIMEOUT);
+    }
+    if (BLACK === 1) {
+        BLACK_TIMEOUT = parseInt(document.getElementById("black-timeout-input").value);
+    }
+    if (BLACK === 1 && WHITE === 0) {
+        if (!PLAYING) {
+            PLAYING = true;
+            prudensMove(-1);
+        }
+    } else if (BLACK === 1 && WHITE === 1) {
+        if (!ANIMATED) {
+            WHITE_TIMEOUT = 0;
+            BLACK_TIMEOUT = 0;
+            showGameProgress();
+        }
+        BULK_GAMES_NUM = parseInt(document.getElementById("games-num").value);
+        gameLoop(-1, 0);
+    }
+}
+
+function gameLoop(color, i) {
+    return new Promise((resolve, reject) => {
+        BULK_GAMES_CURRENT = i;
+        if (i >= BULK_GAMES_NUM) {
+            const bulkId = `bulk${WHITE === 0 ? "h" : "p"}${BLACK === 0 ? "h" : "p"}${BULK_GAMES_NUM}_${Date.now()}`;
+            download(bulkId + ".json", JSON.stringify(BULK_GAMES));
+            const doneButton = document.getElementById("done-button");
+            doneButton.removeEventListener("click", resetSettings, false);
+            doneButton.addEventListener("click", finalizeSettings, false);
+            BULK_GAMES = [];
+            if (document.getElementById("progress-bar-blocker")) {
+                document.getElementById("progress-bar-blocker").remove();
+            }
+            resolve();
+            return;
+        }
+        if (isGameOver()) {
+            document.getElementById("blacks").innerText = SCORE[0];
+            document.getElementById("whites").innerText = SCORE[1];
+            BULK_GAMES.push(prepareGameforDownload());
+            gameOverCounter = 0;
+            resetGame();
+            resolve(true);
+            return;
+        }
+        prudensAutoplay(color).then(() => {
+            gameLoop((-1) * color, i).then((gameOver) => {
+                if (gameOver) {
+                    gameLoop(-1, i + 1);
+                }
+            });
+        });
+        return;
+    });
+}
+
+function showGameProgress() {
+    const blocker = document.createElement("div");
+    blocker.classList.add("blocker", "blurry", "top", "flexy");
+    blocker.id = "progress-bar-blocker";
+    document.body.append(blocker);
+    const pbContainer = document.createElement("div");
+    pbContainer.classList.add("progress-bar-container");
+    const progressBar = document.createElement("div");
+    progressBar.classList.add("progress-bar");
+    progressBar.id = "progress-bar";
+    pbContainer.append(progressBar);
+    blocker.append(pbContainer);
+    updateProgressBar();
+}
+
+function updateProgressBar() {
+    const pbWidth = Math.ceil((((60 - EMPTY_CELLS) / 60 + BULK_GAMES_CURRENT) / BULK_GAMES_NUM) * 600);
+    const pb = document.getElementById("progress-bar");
+    // console.log(pb.offsetWidth);
+    if (pb && EMPTY_CELLS > 0) {
+        setTimeout(() => {
+            pb.style.width = pbWidth + "px";
+            // console.log(pbWidth);
+            updateProgressBar();
+        }, 2);
+    }
 }
 
 function showPlayModeSettings() {
@@ -1285,6 +1509,58 @@ function showPlayModeSettings() {
     const whiteSettings = setupPlayerSettings("white", {right: true});
     gameSettingsContainer.append(blackSettings);
     gameSettingsContainer.append(whiteSettings);
+    const doneButtonContainer = document.createElement("div");
+    doneButtonContainer.classList.add("game-settings-done");
+    const pvpContainer = document.createElement("div");
+    pvpContainer.classList.add("pvp-settings-container", "inactive");
+    pvpContainer.id = "pvp-settings-container";
+    const animateContainer = document.createElement("div");
+    animateContainer.classList.add("animate-container");
+    animateContainer.id = "animate-container";
+    const animateLabel = document.createElement("label");
+    animateLabel.for = "animate";
+    animateLabel.append(document.createTextNode("Animate Moves"));
+    animateLabel.addEventListener("click", () => {
+        animateCheckbox.click();
+    }, false);
+    const animateCheckbox = document.createElement("input");
+    animateCheckbox.type = "checkbox";
+    animateCheckbox.id = "animate";
+    animateCheckbox.name = "animate";
+    animateCheckbox.checked = true;
+    animateContainer.append(animateCheckbox);
+    animateContainer.append(animateLabel);
+    pvpContainer.append(animateContainer);
+    const gamesNumContainer = document.createElement("div");
+    const gamesNumLabel = document.createElement("label");
+    const gamesNumInput = document.createElement("input");
+    gamesNumContainer.classList.add("games-number-container");
+    gamesNumLabel.for = "games-num";
+    gamesNumLabel.append(document.createTextNode("Games:"));
+    gamesNumInput.type = "text";
+    gamesNumInput.id = "games-num";
+    gamesNumInput.name = "games-num";
+    gamesNumInput.minLength = 1;
+    gamesNumInput.maxLength = 6;
+    gamesNumInput.size = 8;
+    gamesNumInput.value = "1";
+    gamesNumContainer.append(gamesNumLabel);
+    gamesNumContainer.append(gamesNumInput);
+    pvpContainer.append(gamesNumContainer);
+    const animateBlocker = document.createElement("div");
+    animateBlocker.classList.add("blocker", "transparent");
+    animateBlocker.id = "animate-blocker";
+    pvpContainer.append(animateBlocker);
+    const doneButton = document.createElement("div");
+    doneButton.classList.add("policy-upload-button", "finalize-settings-button");
+    doneButton.addEventListener("click", finalizeSettings, false);
+    const doneIcon = document.createElement("i");
+    doneIcon.classList.add("fa", "fa-check");
+    doneButton.id = "done-button";
+    doneButton.append(doneIcon);
+    doneButtonContainer.append(pvpContainer);
+    doneButtonContainer.append(doneButton);
+    gameSettingsContainer.append(doneButtonContainer);
     const gh = getGameHistory();
     const saveGame = getSaveGameButton();
     const gameNavContainer = document.createElement("div");
@@ -1309,9 +1585,10 @@ function getSaveGameButton() {
     const container = document.createElement("div");
     container.classList.add("game-up-down-load-container");
     const button = document.createElement("div");
-    button.classList.add("game-load-container");
-    button.addEventListener("click", downloadGame, false);
+    button.classList.add("game-load-container", "inactive");
+    // button.addEventListener("click", downloadGame, false);
     button.append(document.createTextNode("Save "));
+    button.id = "save-game-button";
     const icon = document.createElement("i");
     icon.classList.add("fa");
     icon.classList.add("fa-download");
@@ -1396,11 +1673,11 @@ function setupPlayerSettings(color, params = {
     const playerType = document.createElement("div");
     playerLabel.innerHTML = "<b>Player</b>:";
     playerType.classList.add("player-type-container");
-    playerType.innerText = params.defaultPlayers[color];
     const downArrow = document.createElement("div");
     downArrow.classList.add("fa");
     downArrow.classList.add("fa-angle-down");
     playerType.append(downArrow);
+    playerType.append(document.createTextNode(params.defaultPlayers[color]));
     playerType.id = color + "-type";
     const dropdown = playerTypeDropdown(color);
     playerType.append(dropdown);
@@ -1410,15 +1687,47 @@ function setupPlayerSettings(color, params = {
     particularsLabel.innerHTML = "<b>Policy</b>:";
 	particularsLabel.id = color + "-particulars-label";
 	particulars.type = "file";
-	particulars.addEventListener("change", uploadPolicy, false);
+	particulars.addEventListener("change", (function(x) {
+        return function() {
+            const files = this.files;
+            // console.log(x);
+            uploadPolicy(files, x === "white" ? 0 : 1);
+        };
+    }) (color), false);
 	particulars.id = color + "-particulars";
-	particularsButton.innerText = "Upload...";
+    const uploadTextNode = document.createTextNode("Upload...");
+    // console.log(uploadTextNode.id);
+	particularsButton.append(uploadTextNode);
+    const uploadIcon = document.createElement("i");
+    uploadIcon.classList.add("fa", "fa-upload");
+    particularsButton.append(uploadIcon);
 	particularsButton.id = color + "-policy-button";
+    particularsButton.classList.add("policy-upload-button");
+    const prudensTimeoutLabel = document.createElement("div");
+    prudensTimeoutLabel.innerHTML = "<b>Wait</b>:";
+    prudensTimeoutLabel.id = color + "-timeout-label";
+    const prudensTimeoutContainer = document.createElement("div");
+    prudensTimeoutContainer.classList.add("timeout-container");
+    prudensTimeoutContainer.id = color + "-timeout-container";
+    const prudensTimeoutInput = document.createElement("input");
+    prudensTimeoutInput.type = "text";
+    prudensTimeoutInput.id = color + "-timeout-input";
+    prudensTimeoutInput.minLength = "1";
+    prudensTimeoutInput.maxLength = "5";
+    prudensTimeoutInput.size = "5";
+    prudensTimeoutInput.pattern = /\d{1,5}/g;
+    prudensTimeoutInput.title = "Up to five digits."
+    prudensTimeoutInput.value = "500"; // TODO It remains to add an envent listener and capture the timeout somehow.
+    const prudensTimeoutUnit = document.createTextNode("ms");
+    prudensTimeoutContainer.append(prudensTimeoutInput);
+    prudensTimeoutContainer.append(prudensTimeoutUnit);
     if (params.defaultPlayers[color] !== "Prudens") {
     	particularsLabel.classList.add("inactive");
 		particularsButton.classList.add("inactive");
+        prudensTimeoutContainer.classList.add("inactive");
+        prudensTimeoutInput.readOnly = true;
+        prudensTimeoutLabel.classList.add("inactive");
     } else {
-    	particularsButton.classList.add("policy-upload-button");
     	particularsButton.tempFunc = () => {particulars.click();};
 		particularsButton.addEventListener("click", particularsButton.tempFunc, false);
     }
@@ -1429,6 +1738,8 @@ function setupPlayerSettings(color, params = {
     settings.append(particularsLabel);
     settings.append(particulars);
     settings.append(particularsButton);
+    settings.append(prudensTimeoutLabel);
+    settings.append(prudensTimeoutContainer);
     return settings;
 }
 
@@ -1448,6 +1759,19 @@ function playerTypeDropdown(color) {
             } else {
                 BLACK = i;
             }
+            let animationContainer, animateBlocker;
+            if (WHITE === 1 && BLACK === 1) {
+                animationContainer = document.getElementById("pvp-settings-container");
+                animationContainer.classList.remove("inactive");
+                document.getElementById("animate-blocker").remove();
+            } else if (!document.getElementById("animate-blocker")) {
+                animateBlocker = document.createElement("div");
+                animateBlocker.classList.add("blocker", "transparent");
+                animateBlocker.id = "animate-blocker";
+                animationContainer = document.getElementById("pvp-settings-container");
+                animationContainer.append(animateBlocker);
+                animationContainer.classList.add("inactive");
+            }
             const ggParent = event.target.parentElement.parentElement.parentElement;
             for (const child of ggParent.childNodes) {
             	if (child.nodeType === 3) {
@@ -1456,23 +1780,41 @@ function playerTypeDropdown(color) {
             }
             const newTextNode = document.createTextNode(PLAYER_OPTIONS[i]);
             ggParent.append(newTextNode);
+            const label = document.getElementById(color + "-particulars-label");
+            const button = document.getElementById(color + "-policy-button");
+            const msLabel = document.getElementById(color + "-timeout-label");
+            const msContainer = document.getElementById(color + "-timeout-container");
+            const msInput = document.getElementById(color + "-timeout-input");
             if (i === 1) {
-            	const label = document.getElementById(color + "-particulars-label");
-            	const button = document.getElementById(color + "-policy-button");
             	label.classList.remove("inactive");
             	button.classList.remove("inactive");
             	button.classList.add("policy-upload-button");
+                msLabel.classList.remove("inactive");
+                msContainer.classList.remove("inactive");
+                msInput.readOnly = false;
             	activatePolicyUpload(color);
+                if (color === "black") {
+                    toggleLegalMoves();
+                }
             } else if (i === 0) {
-            	const label = document.getElementById(color + "-particulars-label");
-            	const button = document.getElementById(color + "-policy-button");
             	if (!label.classList.contains("inactive")) {
 	            	label.classList.add("inactive");	
             	}
             	if (!button.classList.contains("inactive")) {
 					button.classList.add("inactive");            	
             	}
-            	button.classList.remove("policy-upload-button");
+                if (!msLabel.classList.contains("inactive")) {
+                    msLabel.classList.add("inactive");
+                }
+                if (!msContainer.classList.contains("inactive")) {
+                    msContainer.classList.add("inactive");
+                }
+                msInput.readOnly = true;
+                // console.log("Human player");
+            	if (color === "black") {
+                    // console.log("Black player");
+                    toggleLegalMoves(false);
+                }
             	button.removeEventListener("click", button.tempFunc, false);
             }
         }, false)
@@ -1480,6 +1822,27 @@ function playerTypeDropdown(color) {
     }
     dropdown.append(dropdownUl);
     return dropdown;
+}
+
+function toggleLegalMoves(block = true) {
+    let cell, blocker;
+    for (const cellId of LEGAL_MOVES) {
+        if (block && !document.getElementById(cellId + "-blocker")) {
+            cell = document.getElementById(cellId);
+            blocker = document.createElement("div");
+            blocker.classList.add("blocker", "transparent");
+            blocker.id = cellId + "-blocker";
+            cell.append(blocker);
+        } else {
+            const lmBlocker = document.getElementById(cellId + "-blocker");
+            // console.log(document.querySelectorAll('div[id$="blocker"]'));
+            if (lmBlocker) {
+                // console.log("removed blocker");
+                lmBlocker.remove();
+            }
+
+        }
+    }
 }
 
 function activatePolicyUpload(color) {
@@ -1566,7 +1929,10 @@ function getAuditSettings() {
     gameUploadLabel.innerHTML = "<b>Current Game</b>:";
     const gameUploadButton = document.createElement("div");
     gameUploadButton.classList.add("policy-upload-button");
-    gameUploadButton.innerText = "Upload...";
+    gameUploadButton.append(document.createTextNode("Upload..."));
+    const uploadIcon = document.createElement("i");
+    uploadIcon.classList.add("fa", "fa-upload");
+    gameUploadButton.append(uploadIcon);
     const gameUploadInput = document.createElement("input");
     gameUploadInput.type = "file";
     gameUploadButton.addEventListener("click", () => {gameUploadInput.click()}, false);
@@ -1643,24 +2009,6 @@ function getGameHeader() {
 
 function main() {
     initializeBoard();
-    // const policyFileInput = document.getElementById("policy-file");
-    // const gameFileInput = document.getElementById("game-file");
-    // const policyButton = document.getElementById("policy-button");
-    // const gameButton = document.getElementById("game-load-button");
-    // policyFileInput.addEventListener("change", uploadPolicy, false);
-    // policyButton.addEventListener("click", (e) => {
-    //     policyFileInput.click();
-    // });
-    // gameFileInput.addEventListener("change", loadGame, false);
-    // gameButton.addEventListener("click", (e) => {
-    //     gameFileInput.click();
-    // });
-    // document.getElementById("moves").addEventListener("scroll", scrollGameHistory, false);
-    // document.getElementById("mode-ball").addEventListener("click", changeGameMode, false);
-    // const modeSetting = document.getElementById("mode-setting-container");
-    // const blocker = document.createElement("div");
-    // blocker.classList.add("specification-menu-blocker");
-    // modeSetting.append(blocker);
 }
 
 window.addEventListener("load", main);
