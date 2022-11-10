@@ -4,7 +4,7 @@ let RULE_MAP = new Map();
 let RULE_MAP_JSON = [{}, {}]; // 0 = white, 1 = black.
 let basePatterns = [];
 let existsHead = false;
-let N_RULES = 0;
+let N_RULES = [0, 0];
 
 let pRow, pCol;
 
@@ -239,10 +239,10 @@ function updatePolicy() {
     for (const pattern of basePatterns) {
         ruleString = transpileToRule(pattern);
         if (!ruleStrings.includes(ruleString)) {
-            policyString += "R" + N_RULES + ruleString + "\n";
-            RULE_MAP.set("R" + N_RULES, transpileToFn(pattern, "R" + N_RULES));
+            policyString += "R" + N_RULES[CURRENT_PLAYER] + ruleString + "\n";
+            RULE_MAP.set("R" + N_RULES[CURRENT_PLAYER], transpileToFn(pattern, "R" + N_RULES[CURRENT_PLAYER]));
             ruleStrings.push(ruleString);
-            N_RULES++;
+            N_RULES[CURRENT_PLAYER]++;
         }
     }
     coachedPolicyStrings += policyString;
@@ -314,8 +314,18 @@ function loadRuleMap() {
 }
 
 function downloadPolicy() {
-    const policyJSON = preparePoliciesForDownload(); // TODO Redefine this function for a single policy!
-    download("policy.json", JSON.stringify(policyJSON, null, 2));
+    const policyJSON = preparePolicyForDownload(); // TODO Redefine this function for a single policy!
+    download(policyJSON["id"] + ".json", JSON.stringify(policyJSON, null, 2));
+}
+
+function preparePolicyForDownload(player) {
+    const policyJSON = {
+        id: `${coachedPolicyStrings[player] === "" ? POLICIES[player]["id"] : "p" + Date.now()}`,
+        nRules: N_RULES[player],
+        policy: `${POLICIES[player]["text"][0] === "@" ? "" : "@Knowledge"}${POLICIES[player]["text"] ? POLICIES[player]["text"] : ""}\n${coachedPolicyStrings[player]}`,
+        ruleMap: RULE_MAP_JSON[player],
+    };
+    return policyJSON;
 }
 
 function download(filename, content) {
@@ -330,11 +340,11 @@ function download(filename, content) {
 
 function preparePoliciesForDownload() {
     const policyJSON = {
-        policiesId: "pps" + Date.now(),
+        policiesIds: [POLICIES[0]["id"], POLICIES[1]["id"]],
         nRules: N_RULES,
         policies: [
-            `${POLICIES[0][0] === "@" ? "" : "@Knowledge"}${POLICIES[0]}\n${coachedPolicyStrings[0]}`,
-            `${POLICIES[1][0] === "@" ? "" : "@Knowledge"}${POLICIES[1]}\n${coachedPolicyStrings[1]}`,
+            `${POLICIES[0]["text"][0] === "@" ? "" : "@Knowledge"}${POLICIES[0]["text"] ? POLICIES[0]["text"] : ""}\n${coachedPolicyStrings[0]}`,
+            `${POLICIES[1]["text"][0] === "@" ? "" : "@Knowledge"}${POLICIES[1]["text"] ? POLICIES[1]["text"] : ""}\n${coachedPolicyStrings[1]}`,
         ],
         ruleMap: RULE_MAP_JSON,
     };

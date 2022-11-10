@@ -26,6 +26,8 @@ let BULK_GAMES_CURRENT = 0;
 let BULK_GAMES = [];
 let CURRENT_PLAYER = 1; // 0 = white, 1 = black;
 
+const TIMEOUT_IDS = [];
+
 const SCORE = [2, 2];
 
 let gameOverCounter = 0;
@@ -61,7 +63,15 @@ let FINALIZED_SETTINGS = false;
 // TEST_POLICY = `@Knowledge
 // RME :: legalMove(X,Y), cell(X+1,Y,-1), cell(X+2,Y,1) implies move(X,Y);`
 
-const POLICIES = [{}, {}];
+let POLICIES = [{
+        id: "",
+        text: "",
+        json: {},
+    }, {
+        id: "",
+        text: "",
+        json: {},
+    }];
 
 // let TEST_POLICY = "";
 
@@ -214,8 +224,13 @@ function drawLegalMoves(color = -1, interactive = true, legalMoves = undefined) 
 
 function eraseLegalMoves() {
     let cellContainer;
+    console.log(LEGAL_MOVES);
     for (const cellId of LEGAL_MOVES) {
         cellContainer = document.getElementById(cellId);
+        console.log("erase cell:", cellContainer);
+        if (document.getElementById(cellId + "-blocker")) {
+            document.getElementById(cellId + "-blocker").remove();
+        }
         while (cellContainer.firstChild) {
             cellContainer.removeChild(cellContainer.lastChild);
         }
@@ -488,7 +503,7 @@ function randomMove(color = -1) {
 	return 0;
 }
 
-function makeDoubleMove(row, col, color = -1) {
+function makeDoubleMove(row, col, color = -1) { // FIXME When the human player has NO LEGAL MOVE, the machine should play automatically!
     if (!FINALIZED_SETTINGS) {
         finalizeSettings();
     }
@@ -536,7 +551,7 @@ function prudensAutoplay(color) {
     }
     return new Promise((resolve) => {
         const timeOut = color === 1 ? WHITE_TIMEOUT : BLACK_TIMEOUT;
-        setTimeout(() => {
+        TIMEOUT_IDS.push(setTimeout(() => {
             if (LEGAL_MOVES.length > 0) {
                 const move = prudensMove(color);
                 gameOverCounter = 0;
@@ -549,7 +564,7 @@ function prudensAutoplay(color) {
                 gameOverCounter++;
             }
             resolve();
-        }, timeOut);
+        }, timeOut));
     });
 }
 
@@ -691,7 +706,9 @@ function nextMove(casualCall = true) {
     row = prevMove["cell"][0];
     col = prevMove["cell"][1];
     color = prevMove["color"];
+    LEGAL_MOVES = prevMove["legalMoves"];
     let value;
+    console.log("here");
     eraseLegalMoves();
     if (currentMove === CURRENT_GAME.length) {
         canMoveForward = false;
@@ -714,18 +731,22 @@ function nextMove(casualCall = true) {
     } else {
         const thisMove = CURRENT_GAME[currentMove];
         BOARD = thisMove["board"];
+        LEGAL_MOVES = thisMove["legalMoves"];
         drawBoard(thisMove["board"]);
         drawLegalMoves(color, false, thisMove["legalMoves"]);
-        if (prevMove["explanation"] === {}) {
+        // if (prevMove["explanation"] === {}) {
             EXPLANATION = prevMove["explanation"];
             // console.log(EXPLANATION);
             explain();
-        }
+        // }
         value = true;
     }
     if (row > -1 && col > -1) {
+        console.log(row, col);
         const cell = document.getElementById("oc-" + row + "-" + col);
+        console.log(cell);
         const piece = cell.firstChild;
+        console.log(piece);
         const redDot = document.createElement("div");
         redDot.id = "last-move";
         redDot.classList.add("othello-last-move");
@@ -978,7 +999,7 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
 function otDeduce() {
     // console.log(CURRENT_PLAYER);
     const kbObject = POLICIES[CURRENT_PLAYER]["json"];
-    if (kbObject === undefined) {
+    if (kbObject["type"] === undefined) {
         return {
             output: undefined,
             inferences: "",
@@ -1037,6 +1058,9 @@ function explain() {
     if (!alreadyFlipped) {
         flipPieces(EXPLANATION["flipped"]);
         alreadyFlipped = true;
+    }
+    if (EXPLANATION.body === undefined) {
+        return;
     }
     for (const cell of EXPLANATION.body) {
         if (cell[0] < 0 || cell[1] < 0 || cell[0] === N_ROWS || cell[1] === N_COLS) {
@@ -1158,11 +1182,15 @@ function setupMode() {
 }
 
 function prepareGameforDownload() {
-    let gameId = `${BLACK === 0 ? "h" : "p"}${WHITE === 0 ? "h" : "p"}_${Date.now()}`; // TODO Maybe add policy id?
+    let gameId = `${BLACK === 0 ? "h" : "p"}${WHITE === 0 ? "h" : "p"}_${SCORE[0]}_${SCORE[1]}_${Date.now()}`; // TODO Maybe add policy id?
+    console.log(POLICIES);
     return {
         gameId: gameId,
         game: CURRENT_GAME,
-        policies: preparePoliciesForDownload(),
+        policies: [
+            preparePolicyForDownload(0),
+            preparePolicyForDownload(1),
+        ],
         lastBoard: BOARD,
         lastLegalMoves: [...LEGAL_MOVES],
     }
@@ -1171,7 +1199,7 @@ function prepareGameforDownload() {
 function downloadGame() {
     // console.log("download");
     const preparedGame = prepareGameforDownload();
-    download("game.json", JSON.stringify(preparedGame, null, 2));
+    download(preparedGame["gameId"] + ".json", JSON.stringify(preparedGame, null, 2));
 }
 
 function uploadPolicy(files, player) {
@@ -1181,13 +1209,14 @@ function uploadPolicy(files, player) {
         const policyJSON = JSON.parse(reader.result);
         N_RULES = policyJSON.nRules;
         POLICIES[player] = {
+            id: policyJSON.id,
             text: policyJSON.policy,
             json: parseKB(policyJSON.policy),
         }
         RULE_MAP_JSON[player] = policyJSON.ruleMap;
-        // console.log(player);
+        console.log(POLICIES);
         const policyButton = document.getElementById(`${player === 0 ? "white" : "black"}-policy-button`);
-        // console.log(policyButton);
+        console.log(policyButton);
         for (const child of policyButton.childNodes) {
             if (child.nodeType === Node.TEXT_NODE) {
                 let filename = files[0].name;
@@ -1284,27 +1313,62 @@ function pauseGame() {
 
 function loadGame() {
     const reader = new FileReader();
-    let gameJSON, policyJSON, ball;//, modeSetting, blocker;
+    let gameJSON, policyJSON;
     reader.onload = (() => {
-        ball = document.getElementById("mode-ball");
-        ball.click();
-        // modeSetting = document.getElementById("mode-setting-container");
-        // modeSetting.classList.add("inactive");
-        // blocker = document.createElement("div");
-        // blocker.classList.add("specification-menu-blocker");
-        // modeSetting.append(blocker);
+        const blackType = document.getElementById("black-type");
+        const whiteType = document.getElementById("white-type");
+        const blackPB = document.getElementById("black-policy-button");
+        const whitePB = document.getElementById("white-policy-button");
         gameJSON = JSON.parse(reader.result);
+        const gameId = gameJSON["gameId"];
+        const time = parseInt(gameId.split("_")[3]);
+        blackType.innerText = `${gameId[0] === "h" ? "Human" : "Prudens"}`;
+        whiteType.innerText = `${gameId[1] === "h" ? "Human" : "Prudens"}`;
+        whitePB.innerText = shortenString(`${gameJSON["policies"][0]["id"] ? gameJSON["policies"][0]["id"] : "NA"}`, 12, 4);
+        blackPB.innerText = shortenString(`${gameJSON["policies"][1]["id"] ? gameJSON["policies"][1]["id"] : "NA"}`, 12, 4);
         CURRENT_GAME = gameJSON.game;
         TEMP_BOARD = gameJSON.lastBoard;
         LEGAL_MOVES = gameJSON.lastLegalMoves;
         loadGameHistory();
-        policyJSON = gameJSON.policy;
+        policyJSON = gameJSON.policies;
         N_RULES = policyJSON.nRules;
-        TEST_POLICY = policyJSON.policy;
-        RULE_MAP_JSON = policyJSON.ruleMap;
+        POLICIES = policyJSON.policy;
+        RULE_MAP_JSON = [policyJSON[0].ruleMap, policyJSON[1].ruleMap];
         loadRuleMap();
+        const loadGameButton = document.getElementById("game-upload-button");
+        for (const child of loadGameButton.childNodes) {
+            let filename = this.files[0].name;
+            if (filename.length > 16) {
+                filename = filename.substring(0, 4) + "..." + filename.substring(filename.length - 9, filename.length - 5);
+            }
+            if (child.nodeType === Node.TEXT_NODE) {
+                child.textContent = filename;
+            }
+        }
+        const gameDate = document.getElementById("game-date");
+        const date = new Date(time);
+        gameDate.innerText = "";
+        gameDate.append(parseDate(date));
     });
     reader.readAsText(this.files[0]);
+}
+
+function shortenString(string, n, m, suffix = 5) {
+    if (string.length > n) {
+        string = string.substring(0, m) + "..." + string.substring(string.length - suffix - m, string.length - suffix);
+    }
+    return string;
+}
+
+function parseDate(date) {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const ms = document.createElement("span");
+    ms.classList.add("ms-container");
+    ms.innerText = date.getMilliseconds();
+    const dateContainer = document.createElement("span");
+    dateContainer.append(date.getDate() + " " + months[date.getMonth()] + " " + date.getFullYear() + ", " + date.getHours() + ":" + date.getMinutes() + ":" + date.getSeconds() + ":");
+    dateContainer.append(ms);
+    return dateContainer;
 }
 
 function enterPlayMode() {
@@ -1326,7 +1390,7 @@ function enterPlayMode() {
             resetGame();
         }
     } else if (MODE === 1) {
-        const isNonEmpty = coachedPolicyString !== "";
+        const isNonEmpty = coachedPolicyStrings[0] !== "" && coachedPolicyStrings[1] !== "";
         const audit = confirm(`${isNonEmpty ? "Save policy and s" : "S"}tart a new game?`);
         if (audit) {
             MODE = 0;
@@ -1346,6 +1410,9 @@ function enterPlayMode() {
 
 function resetGame() {
     PLAYING = false;
+    for (const timeoutId of TIMEOUT_IDS) {
+        clearTimeout(timeoutId);
+    }
     const gameSettingsContainer = document.getElementById("game-settings-container");
     if (gameSettingsContainer) {
         // gameSettingsContainer.style.opacity = 1.0;
@@ -1359,7 +1426,7 @@ function resetGame() {
             doneButton.firstChild.classList.remove("fa-refresh");
             doneButton.firstChild.classList.add("fa-check");
             doneButton.removeEventListener("click", resetSettings, false);
-            doneButton.removeEventListener("click", finalizeSettings, false);
+            doneButton.addEventListener("click", finalizeSettings, false);
             FINALIZED_SETTINGS = false;
         }
     }
@@ -1378,14 +1445,19 @@ function resetSettings() {
     if (reSettings) {
         downloadGame();
         resetGame();
-        const doneButton = document.getElementById("done-button");
-        doneButton.removeEventListener("click", resetSettings, false);
-        doneButton.addEventListener("click", finalizeSettings, false);
+        // const doneButton = document.getElementById("done-button");
+        // doneButton.removeEventListener("click", resetSettings, false);
+        // doneButton.addEventListener("click", finalizeSettings, false);
+        // FINALIZED_SETTINGS = false;
+        // doneButton.firstChild.classList.remove("fa-refresh");
+        // doneButton.firstChild.classList.add("fa-check");
     }
 }
 
 function finalizeSettings() { // TODO Add event so as to track whether settings have changed and ask user to restart game, save etc.
     // TODO (cont'd) You need to generate a SETTINGS object where you store all settings, like, who plays, what type of player, type particulars etc.
+    // console.log("finalize?");
+    // console.trace();
     ANIMATED = document.getElementById("animate").checked;
     if (!FINALIZED_SETTINGS) {
         if (ANIMATED) {
@@ -1401,18 +1473,23 @@ function finalizeSettings() { // TODO Add event so as to track whether settings 
             doneButton.addEventListener("click", resetSettings, false);
             FINALIZED_SETTINGS = true;
         }
+        // FINALIZED_SETTINGS = true;
         updateSettings();
     } else {
         const blocker = document.getElementById("settings-blocker");
-        blocker.remove();
+        if (blocker) {
+            blocker.remove();
+        }
         const doneButton = document.getElementById("done-button");
         doneButton.firstChild.classList.remove("fa-refresh");
         doneButton.firstChild.classList.add("fa-check");
         FINALIZED_SETTINGS = false;
+        // console.log("finalized settings");
     }
 }
 
 function updateSettings() {
+    // console.log("update settings");
     if (WHITE === 1) {
         WHITE_TIMEOUT = parseInt(document.getElementById("white-timeout-input").value);
         // console.log("In:", WHITE_TIMEOUT);
@@ -1426,6 +1503,7 @@ function updateSettings() {
             prudensMove(-1);
         }
     } else if (BLACK === 1 && WHITE === 1) {
+        // console.log("pvp");
         if (!ANIMATED) {
             WHITE_TIMEOUT = 0;
             BLACK_TIMEOUT = 0;
@@ -1810,6 +1888,10 @@ function playerTypeDropdown(color) {
                     msContainer.classList.add("inactive");
                 }
                 msInput.readOnly = true;
+                const animatedCheckbox = document.getElementById("animate");
+                if (!animatedCheckbox.checked) {
+                    animatedCheckbox.click();
+                }
                 // console.log("Human player");
             	if (color === "black") {
                     // console.log("Black player");
@@ -1929,6 +2011,7 @@ function getAuditSettings() {
     gameUploadLabel.innerHTML = "<b>Current Game</b>:";
     const gameUploadButton = document.createElement("div");
     gameUploadButton.classList.add("policy-upload-button");
+    gameUploadButton.id = "game-upload-button";
     gameUploadButton.append(document.createTextNode("Upload..."));
     const uploadIcon = document.createElement("i");
     uploadIcon.classList.add("fa", "fa-upload");
@@ -1945,7 +2028,24 @@ function getAuditSettings() {
     container.append(gameUploadContainer);
     container.append(getAuditPlayerSettings("black"));
     container.append(getAuditPlayerSettings("white", {right: true}));
+    const dateLine = document.createElement("div");
+    dateLine.classList.add("date-line");
+    dateLine.append(getDateContainer());
+    container.append(dateLine);
     return container;
+}
+
+function getDateContainer() {
+    const dateContainer = document.createElement("div");
+    dateContainer.classList.add("date-container");
+    const dateLabel = document.createElement("div");
+    dateLabel.innerHTML = "<b>Game date</b>: ";
+    const gameDate = document.createElement("div");
+    gameDate.id = "game-date";
+    gameDate.innerText = "??"
+    dateContainer.append(dateLabel);
+    dateContainer.append(gameDate);
+    return dateContainer;
 }
 
 function getAuditPlayerSettings(color, params = {

@@ -901,6 +901,21 @@ li.literal + li.literal {
     align-items: center;
 }
 
+.date-container {
+    display: flex;
+    gap: 15px;
+}
+
+.date-line {
+    grid-area: 3 / 1 / 4 / 3;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.ms-container {
+    font-size: 8pt;
+}
+
 /* Progress bar */
 
 .progress-bar-container {
