@@ -54,9 +54,9 @@ function initPattern() {
 
 function addPattern() {
     initPattern();
-    const addButton = document.getElementById("add-button");
-    addButton.innerText = "Done!";
-    addButton.onclick = doneWithPattern;
+    // const addButton = document.getElementById("add-button");
+    // addButton.innerText = "Done!";
+    // addButton.onclick = doneWithPattern;
     const blocker = document.createElement("div");
     blocker.classList.add("blocker");
     blocker.id = "blocker";

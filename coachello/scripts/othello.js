@@ -151,7 +151,7 @@ function addBlocker(e, params = {blockerStyle: [], id: ""}) {
         blockerStyle: [],
         id: "",
     };
-    for (const key in params) {
+    for (const key in defParams) {
         if (params[key] === undefined) {
             params[key] = defParams[key];
         }
@@ -170,6 +170,7 @@ function addBlocker(e, params = {blockerStyle: [], id: ""}) {
         blocker.id = params.id;
     }
     e.append(blocker);
+    return blocker;
 }
 
 function drawLegalMoves(color = -1, interactive = true, legalMoves = undefined) {
@@ -224,10 +225,10 @@ function drawLegalMoves(color = -1, interactive = true, legalMoves = undefined) 
 
 function eraseLegalMoves() {
     let cellContainer;
-    console.log(LEGAL_MOVES);
+    // console.log(LEGAL_MOVES);
     for (const cellId of LEGAL_MOVES) {
         cellContainer = document.getElementById(cellId);
-        console.log("erase cell:", cellContainer);
+        // console.log("erase cell:", cellContainer);
         if (document.getElementById(cellId + "-blocker")) {
             document.getElementById(cellId + "-blocker").remove();
         }
@@ -366,13 +367,15 @@ function updateGameHistory(row, col, color) {
     if (typeof row === "string" || typeof col === "string") {
         // console.log(row, col, color);
     }
+    const isPrudensPlayer = (color === 1 && WHITE === 1) || (color === 0 && BLACK === 0);
+    // console.log("EXPLANATION:", EXPLANATION);
     CURRENT_GAME.push({
         cell: [row, col],
         color: color,
         board: copyBoard,
         legalMoves: [...LEGAL_MOVES],
         toBeFlipped: TO_BE_FLIPPED,
-        explanation: EXPLANATION === {} ? undefined : EXPLANATION,
+        explanation: isPrudensPlayer ? EXPLANATION : {},
     });
     currentMove = CURRENT_GAME.length;
     canMoveBackward = true;
@@ -590,6 +593,7 @@ function previousMove(casualCall = true) {
         highlightedCell = ""
     }
     currentMove--;
+    removeExplanationBorders();
     updateMoveSpan();
     let prevMove, row, col, color;
     const thisMove = CURRENT_GAME[currentMove];
@@ -698,6 +702,7 @@ function nextMove(casualCall = true) {
         document.getElementById(highlightedCell).classList.remove("highlighted");
         highlightedCell = "";
     }
+    removeExplanationBorders();
     currentMove++;
     // console.log(currentMove);
     updateMoveSpan();
@@ -708,7 +713,7 @@ function nextMove(casualCall = true) {
     color = prevMove["color"];
     LEGAL_MOVES = prevMove["legalMoves"];
     let value;
-    console.log("here");
+    // console.log("here");
     eraseLegalMoves();
     if (currentMove === CURRENT_GAME.length) {
         canMoveForward = false;
@@ -735,18 +740,18 @@ function nextMove(casualCall = true) {
         drawBoard(thisMove["board"]);
         drawLegalMoves(color, false, thisMove["legalMoves"]);
         // if (prevMove["explanation"] === {}) {
-            EXPLANATION = prevMove["explanation"];
-            // console.log(EXPLANATION);
-            explain();
+        EXPLANATION = prevMove["explanation"];
+        // console.log(EXPLANATION);
+        // explain();
         // }
         value = true;
     }
     if (row > -1 && col > -1) {
-        console.log(row, col);
+        // console.log(row, col);
         const cell = document.getElementById("oc-" + row + "-" + col);
-        console.log(cell);
+        // console.log(cell);
         const piece = cell.firstChild;
-        console.log(piece);
+        // console.log(piece);
         const redDot = document.createElement("div");
         redDot.id = "last-move";
         redDot.classList.add("othello-last-move");
@@ -868,6 +873,8 @@ function goToPendingMove(event) {
     cell.addEventListener("highlight", (event) => {
         const toBeFlipped = CURRENT_GAME[moveNumber - 1]["toBeFlipped"]["oc-" + CURRENT_GAME[moveNumber - 1]["cell"].join("-")];
         highlightPendingCell(event, toBeFlipped);
+        EXPLANATION = CURRENT_GAME[moveNumber - 1]["explanation"];
+        explain();
     }, false);
     removeLastDot = false;
     if (moveNumber < currentMoveNumber) {
@@ -875,6 +882,7 @@ function goToPendingMove(event) {
     } else if (moveNumber > currentMoveNumber) {
         forwardFast(true, moveNumber - currentMoveNumber - 1, cell, false);
     }
+    // explain();
 }
 
 function highlightPendingCell(event, toBeFlipped) {
@@ -970,9 +978,11 @@ function prudensMove(color = 1) { // Infers all legible moves according to the p
 		}
 	}
 	if (suggestedMoves.length === 0) {
+        EXPLANATION = {};
 		return randomMove(color);
 	}
     const moveLiteral = suggestedMoves.pop().trim();
+    // console.log("moveLiteral:", moveLiteral);
     generateExplanation(moveLiteral, output);
 	const coords = moveLiteral.substring(5, moveLiteral.length - 1).split(",");
 	const row = coords[0].trim();
@@ -1054,11 +1064,11 @@ function extractContext() { // Convert an othello board to a Prudens context.
 
 function explain() {
     let cellId, bodyCell, bodyBorder;
-    // console.log(EXPLANATION.flipped);
-    if (!alreadyFlipped) {
-        flipPieces(EXPLANATION["flipped"]);
-        alreadyFlipped = true;
-    }
+    // console.log("EXPLANATION:", EXPLANATION);
+    // if (!alreadyFlipped) {
+    //     flipPieces(EXPLANATION["flipped"]);
+    //     alreadyFlipped = true;
+    // }
     if (EXPLANATION.body === undefined) {
         return;
     }
@@ -1101,7 +1111,7 @@ function generateExplanation(inference, output) {
     for (const point of rulePoints) {
         EXPLANATION.body.push([point[0] + row, point[1] + col]);
     }
-    // console.log(EXPLANATION);
+    // console.log("EXPLANTION on generation:", EXPLANATION);
 }
 
 function removeExplanationBorders() {
@@ -1183,7 +1193,7 @@ function setupMode() {
 
 function prepareGameforDownload() {
     let gameId = `${BLACK === 0 ? "h" : "p"}${WHITE === 0 ? "h" : "p"}_${SCORE[0]}_${SCORE[1]}_${Date.now()}`; // TODO Maybe add policy id?
-    console.log(POLICIES);
+    // console.log(POLICIES);
     return {
         gameId: gameId,
         game: CURRENT_GAME,
@@ -1214,9 +1224,9 @@ function uploadPolicy(files, player) {
             json: parseKB(policyJSON.policy),
         }
         RULE_MAP_JSON[player] = policyJSON.ruleMap;
-        console.log(POLICIES);
+        // console.log(POLICIES);
         const policyButton = document.getElementById(`${player === 0 ? "white" : "black"}-policy-button`);
-        console.log(policyButton);
+        // console.log(policyButton);
         for (const child of policyButton.childNodes) {
             if (child.nodeType === Node.TEXT_NODE) {
                 let filename = files[0].name;
@@ -1311,46 +1321,143 @@ function pauseGame() {
     PAUSED = true;
 }
 
-function loadGame() {
-    const reader = new FileReader();
-    let gameJSON, policyJSON;
-    reader.onload = (() => {
-        const blackType = document.getElementById("black-type");
-        const whiteType = document.getElementById("white-type");
-        const blackPB = document.getElementById("black-policy-button");
-        const whitePB = document.getElementById("white-policy-button");
-        gameJSON = JSON.parse(reader.result);
-        const gameId = gameJSON["gameId"];
-        const time = parseInt(gameId.split("_")[3]);
-        blackType.innerText = `${gameId[0] === "h" ? "Human" : "Prudens"}`;
-        whiteType.innerText = `${gameId[1] === "h" ? "Human" : "Prudens"}`;
-        whitePB.innerText = shortenString(`${gameJSON["policies"][0]["id"] ? gameJSON["policies"][0]["id"] : "NA"}`, 12, 4);
-        blackPB.innerText = shortenString(`${gameJSON["policies"][1]["id"] ? gameJSON["policies"][1]["id"] : "NA"}`, 12, 4);
-        CURRENT_GAME = gameJSON.game;
-        TEMP_BOARD = gameJSON.lastBoard;
-        LEGAL_MOVES = gameJSON.lastLegalMoves;
-        loadGameHistory();
-        policyJSON = gameJSON.policies;
-        N_RULES = policyJSON.nRules;
-        POLICIES = policyJSON.policy;
-        RULE_MAP_JSON = [policyJSON[0].ruleMap, policyJSON[1].ruleMap];
-        loadRuleMap();
-        const loadGameButton = document.getElementById("game-upload-button");
-        for (const child of loadGameButton.childNodes) {
-            let filename = this.files[0].name;
-            if (filename.length > 16) {
-                filename = filename.substring(0, 4) + "..." + filename.substring(filename.length - 9, filename.length - 5);
-            }
-            if (child.nodeType === Node.TEXT_NODE) {
-                child.textContent = filename;
-            }
+function stringToId(string) {
+    string = string.toLowerCase();
+    return string.replace(/[^\w]/g, "-");
+}
+
+function loadGame(gameJSON, filename) {
+    if (filename.substring(0, 4) === "bulk") {
+        loadGameList(gameJSON, filename);
+    } else {
+        loadSingleGame(gameJSON, filename);
+    }
+}
+
+function loadGameList(gameJSON, filename) {
+    const blocker = addBlocker(document.body, {blockerStyle: ["top", "blurry"], id: "gl-blocker"});
+    const modal = document.createElement("div");
+    modal.classList.add("bulk-modal-container");
+    modal.id = "gl-modal";
+    const glContainer = document.createElement("div");
+    glContainer.classList.add("game-list-container");
+    let game, gameId, splitId;
+    const colTags = ["Date", "Black", "White", "Result", "Score", "Black Policy", "White Policy"];
+    let col, tag, header, entry, bs, ws, tooltip;
+    const cols = [];
+    for (let i = 0; i < colTags.length; i++) {
+        tag = colTags[i];
+        col = document.createElement("div");
+        col.id = stringToId(tag) + "-col";
+        col.classList.add("game-list-column");
+        header = document.createElement("div");
+        header.classList.add("game-list-entry", "header");
+        if (i > 0) {
+            header.classList.add("pad-left");
         }
-        const gameDate = document.getElementById("game-date");
-        const date = new Date(time);
-        gameDate.innerText = "";
-        gameDate.append(parseDate(date));
-    });
-    reader.readAsText(this.files[0]);
+        header.id = stringToId(tag) + "-header";
+        header.innerText = tag;
+        col.append(header);
+        glContainer.append(col);
+        cols.push(col);
+    }
+    for (let i = 0; i < gameJSON.length; i++) {
+        game = gameJSON[i];
+        gameId = game["gameId"];
+        splitId = gameId.split("_");
+        for (let j = 0; j < colTags.length; j++) {
+            entry = document.createElement("div");
+            entry.classList.add("game-list-entry", `${i % 2 === 0 ? "even" : "odd"}`);
+            if (j > 0) {
+                entry.classList.add("pad-left");
+            }
+            bs = parseInt(splitId[1]);
+            ws = parseInt(splitId[2]);
+            if (j === 0) {
+                entry.append(parseDate(new Date(parseInt(splitId[3]))));
+            } else if (j === 1 || j === 2) {
+                entry.append(`${gameId[j - 1] === "h" ? "Human" : "Prudens"}`);
+            } else if (j === 3) {
+                if (bs > ws) {
+                    entry.innerText = "Black won";
+                } else if (bs === ws) {
+                    entry.innerText = "Draw";
+                } else {
+                    entry.innerText = "White won";
+                }
+            } else if (j === 4) {
+                entry.innerText = bs + "-" + ws;
+            } else if (j === 5 || j === 6) {
+                tooltip = game["policies"][6 - j]["id"] ? game["policies"][6 - j]["id"] : "random";
+                entry.innerText = `${gameId[j - 5] === "h" ? "NA" : shortenString(tooltip, 16, 4)}`;
+                entry.title = tooltip;
+            }
+            cols[j].append(entry);
+        }
+    }
+    const buttonContainer = document.createElement("div");
+    buttonContainer.classList.add("foot-button-container");
+    const loadButton = document.createElement("div");
+    loadButton.classList.add("init-button", "play");
+    loadButton.innerText = "Load";
+    const cancelButton = document.createElement("div");
+    cancelButton.classList.add("init-button", "cancel");
+    cancelButton.innerText = "Cancel";
+    cancelButton.addEventListener("click", hideGameList, false);
+    buttonContainer.append(cancelButton);
+    buttonContainer.append(loadButton);
+    modal.append(glContainer);
+    modal.append(buttonContainer);
+    blocker.append(modal);
+    setTimeout(() => {
+        modal.style.top = "50%";
+    }, 0);
+}
+
+function hideGameList() {
+    const blocker = document.getElementById("gl-blocker");
+    const modal = document.getElementById("gl-modal");
+    modal.style.top = "-100%";
+    setTimeout(() => {
+        modal.remove();
+        blocker.remove();
+    }, 200);
+}
+
+function loadSingleGame(gameJSON, filename) {
+    let policyJSON;
+    const gameId = gameJSON["gameId"];
+    const blackType = document.getElementById("black-type");
+    const whiteType = document.getElementById("white-type");
+    const blackPB = document.getElementById("black-policy-button");
+    const whitePB = document.getElementById("white-policy-button");
+    const time = parseInt(gameId.split("_")[3]);
+    blackType.innerText = `${gameId[0] === "h" ? "Human" : "Prudens"}`;
+    whiteType.innerText = `${gameId[1] === "h" ? "Human" : "Prudens"}`;
+    whitePB.innerText = shortenString(`${gameJSON["policies"][0]["id"] ? gameJSON["policies"][0]["id"] : "NA"}`, 12, 4);
+    blackPB.innerText = shortenString(`${gameJSON["policies"][1]["id"] ? gameJSON["policies"][1]["id"] : "NA"}`, 12, 4);
+    CURRENT_GAME = gameJSON.game;
+    TEMP_BOARD = gameJSON.lastBoard;
+    LEGAL_MOVES = gameJSON.lastLegalMoves;
+    loadGameHistory();
+    policyJSON = gameJSON.policies;
+    N_RULES = policyJSON.nRules;
+    POLICIES = policyJSON.policy;
+    RULE_MAP_JSON = [policyJSON[0].ruleMap, policyJSON[1].ruleMap];
+    loadRuleMap();
+    const loadGameButton = document.getElementById("game-upload-button");
+    for (const child of loadGameButton.childNodes) {
+        if (filename.length > 16) {
+            filename = filename.substring(0, 4) + "..." + filename.substring(filename.length - 9, filename.length - 5);
+        }
+        if (child.nodeType === Node.TEXT_NODE) {
+            child.textContent = filename;
+        }
+    }
+    const gameDate = document.getElementById("game-date");
+    const date = new Date(time);
+    gameDate.innerText = "";
+    gameDate.append(parseDate(date));
 }
 
 function shortenString(string, n, m, suffix = 5) {
@@ -1768,7 +1875,6 @@ function setupPlayerSettings(color, params = {
 	particulars.addEventListener("change", (function(x) {
         return function() {
             const files = this.files;
-            // console.log(x);
             uploadPolicy(files, x === "white" ? 0 : 1);
         };
     }) (color), false);
@@ -2018,8 +2124,14 @@ function getAuditSettings() {
     gameUploadButton.append(uploadIcon);
     const gameUploadInput = document.createElement("input");
     gameUploadInput.type = "file";
-    gameUploadButton.addEventListener("click", () => {gameUploadInput.click()}, false);
-    gameUploadInput.addEventListener("change", loadGame, false);
+    gameUploadButton.addEventListener("click", () => {gameUploadInput.click();}, false);
+    gameUploadInput.addEventListener("change", function() {
+        const reader = new FileReader();
+        reader.onload = (() => {
+            loadGame(JSON.parse(reader.result), this.files[0].name);
+        });
+        reader.readAsText(this.files[0]);
+    }, false);
     const gameUploadContainer = document.createElement("div");
     gameUploadContainer.classList.add("game-upload-container");
     gameUploadContainer.append(gameUploadLabel);
