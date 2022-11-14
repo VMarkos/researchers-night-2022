@@ -47,6 +47,8 @@ const PLAYER_OPTIONS = ["Human", "Prudens"];
 
 let FINALIZED_SETTINGS = false;
 
+let GAME_TO_BE_LOADED = -1;
+
 /* Current Game Structure:
 [
     {
@@ -855,6 +857,9 @@ function goToPendingMove(event) {
         //     cell.classList.remove("flip-highlighted");
         // }
     }
+    // const adviseButton = document.getElementById("advise-button");
+    // adviseButton.classList.remove("inactive");
+    // document.getElementById("advise-blocker").remove();
     const targetSpan = event.currentTarget;
     // console.log(targetSpan);
     const emptyDot = targetSpan.firstChild;
@@ -897,6 +902,9 @@ function highlightPendingCell(event, toBeFlipped) {
 function goToMove(event) {
     const targetSpan = event.currentTarget;
     const moveNumber = parseInt(targetSpan.getAttribute("data-move-number"));
+    // const adviseButton = document.getElementById("advise-button");
+    // adviseButton.classList.add("inactive");
+    // addBlocker(adviseButton, {id: "advise-blocker"});
     let currentMoveNumber = currentMove;
     if (moveNumber < currentMoveNumber) {
         backwardFast(true, currentMoveNumber - moveNumber);
@@ -1193,7 +1201,6 @@ function setupMode() {
 
 function prepareGameforDownload() {
     let gameId = `${BLACK === 0 ? "h" : "p"}${WHITE === 0 ? "h" : "p"}_${SCORE[0]}_${SCORE[1]}_${Date.now()}`; // TODO Maybe add policy id?
-    // console.log(POLICIES);
     return {
         gameId: gameId,
         game: CURRENT_GAME,
@@ -1203,6 +1210,7 @@ function prepareGameforDownload() {
         ],
         lastBoard: BOARD,
         lastLegalMoves: [...LEGAL_MOVES],
+        nRules: N_RULES,
     }
 }
 
@@ -1215,18 +1223,17 @@ function downloadGame() {
 function uploadPolicy(files, player) {
     const reader = new FileReader();
     reader.onload = (() => {
-        // console.log("Loaded");
-        const policyJSON = JSON.parse(reader.result);
-        N_RULES = policyJSON.nRules;
-        POLICIES[player] = {
-            id: policyJSON.id,
-            text: policyJSON.policy,
-            json: parseKB(policyJSON.policy),
-        }
-        RULE_MAP_JSON[player] = policyJSON.ruleMap;
-        // console.log(POLICIES);
+        loadPolicy(JSON.parse(reader.result), player);
+        // const policyJSON = JSON.parse(reader.result);
+        // N_RULES[player] = policyJSON.nRules;
+        // console.log(player);
+        // POLICIES[player] = {
+        //     id: policyJSON.id,
+        //     text: policyJSON.policy,
+        //     json: parseKB(policyJSON.policy),
+        // }
+        // RULE_MAP_JSON[player] = policyJSON.ruleMap;
         const policyButton = document.getElementById(`${player === 0 ? "white" : "black"}-policy-button`);
-        // console.log(policyButton);
         for (const child of policyButton.childNodes) {
             if (child.nodeType === Node.TEXT_NODE) {
                 let filename = files[0].name;
@@ -1244,6 +1251,22 @@ function uploadPolicy(files, player) {
     reader.readAsText(files[0]);
 }
 
+function loadPolicy(policyJSON, player) {
+    // const policyJSON = JSON.parse(reader.result);
+    // console.log("pJOSN:", policyJSON);
+    N_RULES[1 - player] = policyJSON.nRules;
+    // console.log(player);
+    if (!policyJSON.policy.includes("::")) {
+        policyJSON.policy = "";
+    }
+    POLICIES[player] = {
+        id: policyJSON.id,
+        text: policyJSON.policy,
+        json: parseKB(policyJSON.policy),
+    }
+    RULE_MAP_JSON[player] = policyJSON.ruleMap;
+}
+
 function loadGameHistory() {
     let cell, color;
     // console.log(CURRENT_GAME.length);
@@ -1259,8 +1282,6 @@ function loadGameHistory() {
     PLAYING = false;
     const board = document.getElementById("board-container");
     board.innerHTML = "";
-    // EXPLANATION = {}; // Is this needed?
-    // downloadPolicy();
     coachedPolicyString = "";
     // currentMove = undefined;
     initializeBoard(false);
@@ -1368,6 +1389,8 @@ function loadGameList(gameJSON, filename) {
         for (let j = 0; j < colTags.length; j++) {
             entry = document.createElement("div");
             entry.classList.add("game-list-entry", `${i % 2 === 0 ? "even" : "odd"}`);
+            entry.id = stringToId(colTags[j]) + "-" + i;
+            // console.log(entry.id);
             if (j > 0) {
                 entry.classList.add("pad-left");
             }
@@ -1392,6 +1415,27 @@ function loadGameList(gameJSON, filename) {
                 entry.innerText = `${gameId[j - 5] === "h" ? "NA" : shortenString(tooltip, 16, 4)}`;
                 entry.title = tooltip;
             }
+            entry.addEventListener("mouseover", highlightEntry, false);
+            entry.addEventListener("mouseout", unhighlightEntry, false);
+            entry.addEventListener("click", (event) => {
+                const entry = event.currentTarget;
+                const sid = entry.id.split("-");
+                const index = parseInt(sid[sid.length - 1]);
+                if (GAME_TO_BE_LOADED > -1) {
+                    let prevEntry;
+                    for (const tag of colTags) {
+                        prevEntry = document.getElementById(stringToId(tag) + "-" + GAME_TO_BE_LOADED);
+                        prevEntry.classList.remove("highlighted");
+                        prevEntry.addEventListener("mouseout", unhighlightEntry, false);
+                    }
+                }
+                GAME_TO_BE_LOADED = index;
+                let thisEntry;
+                for (const tag of colTags) {
+                    thisEntry = document.getElementById(stringToId(tag) + "-" + index);
+                    thisEntry.removeEventListener("mouseout", unhighlightEntry, false);
+                }
+            }, false);
             cols[j].append(entry);
         }
     }
@@ -1400,6 +1444,16 @@ function loadGameList(gameJSON, filename) {
     const loadButton = document.createElement("div");
     loadButton.classList.add("init-button", "play");
     loadButton.innerText = "Load";
+    loadButton.addEventListener("click", () => {
+        if (GAME_TO_BE_LOADED === -1) {
+            hideGameList();
+            return;
+        }
+        loadSingleGame(gameJSON[GAME_TO_BE_LOADED], filename).then(() => {
+            hideGameList(); 
+        });
+        return;
+    }, false)
     const cancelButton = document.createElement("div");
     cancelButton.classList.add("init-button", "cancel");
     cancelButton.innerText = "Cancel";
@@ -1414,6 +1468,26 @@ function loadGameList(gameJSON, filename) {
     }, 0);
 }
 
+function highlightEntry(event) {
+    const colTags = ["Date", "Black", "White", "Result", "Score", "Black Policy", "White Policy"];
+    const entry = event.currentTarget;
+    const sid = entry.id.split("-");
+    const index = parseInt(sid[sid.length - 1]);
+    for (const tag of colTags) {
+        document.getElementById(stringToId(tag) + "-" + index).classList.add("highlighted");
+    }
+}
+
+function unhighlightEntry(event) {
+    const colTags = ["Date", "Black", "White", "Result", "Score", "Black Policy", "White Policy"];
+    const entry = event.currentTarget;
+    const sid = entry.id.split("-");
+    const index = parseInt(sid[sid.length - 1]);
+    for (const tag of colTags) {
+        document.getElementById(stringToId(tag) + "-" + index).classList.remove("highlighted");
+    }
+}
+
 function hideGameList() {
     const blocker = document.getElementById("gl-blocker");
     const modal = document.getElementById("gl-modal");
@@ -1425,39 +1499,62 @@ function hideGameList() {
 }
 
 function loadSingleGame(gameJSON, filename) {
-    let policyJSON;
-    const gameId = gameJSON["gameId"];
-    const blackType = document.getElementById("black-type");
-    const whiteType = document.getElementById("white-type");
-    const blackPB = document.getElementById("black-policy-button");
-    const whitePB = document.getElementById("white-policy-button");
-    const time = parseInt(gameId.split("_")[3]);
-    blackType.innerText = `${gameId[0] === "h" ? "Human" : "Prudens"}`;
-    whiteType.innerText = `${gameId[1] === "h" ? "Human" : "Prudens"}`;
-    whitePB.innerText = shortenString(`${gameJSON["policies"][0]["id"] ? gameJSON["policies"][0]["id"] : "NA"}`, 12, 4);
-    blackPB.innerText = shortenString(`${gameJSON["policies"][1]["id"] ? gameJSON["policies"][1]["id"] : "NA"}`, 12, 4);
-    CURRENT_GAME = gameJSON.game;
-    TEMP_BOARD = gameJSON.lastBoard;
-    LEGAL_MOVES = gameJSON.lastLegalMoves;
-    loadGameHistory();
-    policyJSON = gameJSON.policies;
-    N_RULES = policyJSON.nRules;
-    POLICIES = policyJSON.policy;
-    RULE_MAP_JSON = [policyJSON[0].ruleMap, policyJSON[1].ruleMap];
-    loadRuleMap();
-    const loadGameButton = document.getElementById("game-upload-button");
-    for (const child of loadGameButton.childNodes) {
-        if (filename.length > 16) {
-            filename = filename.substring(0, 4) + "..." + filename.substring(filename.length - 9, filename.length - 5);
+    return new Promise((resolve, reject) => {
+        let policyJSON, downIcon;
+        const gameId = gameJSON["gameId"];
+        const blackType = document.getElementById("black-type");
+        const whiteType = document.getElementById("white-type");
+        const blackPB = document.getElementById("black-policy-button");
+        const whitePB = document.getElementById("white-policy-button");
+        const time = parseInt(gameId.split("_")[3]);
+        blackType.innerText = `${gameId[0] === "h" ? "Human" : "Prudens"}`;
+        blackPB.innerText = shortenString(`${gameJSON["policies"][1]["id"] ? gameJSON["policies"][1]["id"] : "NA"}`, 12, 4);
+        if (gameId[0] === "p") {
+            downIcon = document.createElement("i");
+            downIcon.classList.add("fa", "fa-download");
+            blackPB.append(downIcon);
+            blackPB.addEventListener("click", () => {
+                downloadPolicy(0);
+            }, false);
         }
-        if (child.nodeType === Node.TEXT_NODE) {
-            child.textContent = filename;
+        whiteType.innerText = `${gameId[1] === "h" ? "Human" : "Prudens"}`;
+        whitePB.innerText = shortenString(`${gameJSON["policies"][0]["id"] ? gameJSON["policies"][0]["id"] : "NA"}`, 12, 4);
+        if (gameId[1] === "p") {
+            downIcon = document.createElement("i");
+            downIcon.classList.add("fa", "fa-download");
+            whitePB.append(downIcon);
+            whitePB.addEventListener("click", () => {
+                downloadPolicy(1);
+            }, false);
         }
-    }
-    const gameDate = document.getElementById("game-date");
-    const date = new Date(time);
-    gameDate.innerText = "";
-    gameDate.append(parseDate(date));
+        CURRENT_GAME = gameJSON.game;
+        TEMP_BOARD = gameJSON.lastBoard;
+        LEGAL_MOVES = gameJSON.lastLegalMoves;
+        loadGameHistory();
+        policyJSON = gameJSON.policies;
+        loadPolicy(policyJSON[0], 0);
+        loadPolicy(policyJSON[1], 1);
+        // N_RULES = [policyJSON[0].nRules, policyJSON[1].nRules];
+        // console.log("Load:", policyJSON);
+        // console.log(policyJSON);
+        // POLICIES = policyJSON;
+        // RULE_MAP_JSON = [policyJSON[0].ruleMap, policyJSON[1].ruleMap];
+        loadRuleMap();
+        const loadGameButton = document.getElementById("game-upload-button");
+        for (const child of loadGameButton.childNodes) {
+            if (filename.length > 16) {
+                filename = filename.substring(0, 4) + "..." + filename.substring(filename.length - 9, filename.length - 5);
+            }
+            if (child.nodeType === Node.TEXT_NODE) {
+                child.textContent = filename;
+            }
+        }
+        const gameDate = document.getElementById("game-date");
+        const date = new Date(time);
+        gameDate.innerText = "";
+        gameDate.append(parseDate(date));
+        resolve();
+    })
 }
 
 function shortenString(string, n, m, suffix = 5) {
@@ -2180,6 +2277,7 @@ function getAuditPlayerSettings(color, params = {
     playerType.id = color + "-type";
     const particularsLabel = document.createElement("div");
     const particularsButton = document.createElement("div");
+    particularsButton.classList.add("policy-upload-button");
     particularsLabel.innerHTML = "<b>Policy</b>:";
 	particularsLabel.id = color + "-particulars-label";
 	particularsButton.innerText = "??";
@@ -2196,17 +2294,18 @@ function getAuditPlayerSettings(color, params = {
 function getGameHeader() {
     const container = document.createElement("div");
     container.classList.add("game-up-down-load-container");
-    const button = document.createElement("div");
-    button.classList.add("game-load-container");
-    button.addEventListener("click", downloadPolicy, false);
-    button.append(document.createTextNode("Save "));
-    const icon = document.createElement("i");
-    icon.classList.add("fa");
-    icon.classList.add("fa-download");
-    button.append(icon);
-    container.append(button);
+    // const button = document.createElement("div");
+    // button.classList.add("game-load-container");
+    // button.addEventListener("click", downloadPolicy, false);
+    // button.append(document.createTextNode("Save "));
+    // const icon = document.createElement("i");
+    // icon.classList.add("fa");
+    // icon.classList.add("fa-download");
+    // button.append(icon);
+    // container.append(button);
     const advise = document.createElement("div");
     advise.classList.add("game-load-container");
+    advise.id = "advise-button";
     advise.addEventListener("click", addPattern, false);
     advise.append(document.createTextNode("Offer advice "));
     const offerIcon = document.createElement("i");

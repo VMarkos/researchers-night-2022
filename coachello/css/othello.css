@@ -209,6 +209,14 @@ input[type="checkbox"] {
     background-color: rgba(12, 60, 43, 0.7);
 }
 
+.init-button.hidden {
+    visibility: hidden;
+}
+
+.init-button.top {
+    z-index: 4;
+}
+
 .init-button:not(.inactive):hover, .why-button:not(.inactive):hover, .reset-button:not(.inactive):hover, .add-button:not(.inactive):hover, .upload-button:not(.inactive):hover {
     opacity: 0.9;
 }
@@ -583,6 +591,12 @@ li.literal + li.literal {
     cursor: not-allowed;
 }
 
+.game-load-container.pot {
+    /* position: relative; */
+    z-index: 4;
+    visibility: hidden;
+}
+
 .game-load-container:hover {
     background-color: rgba(250, 250, 250, .1);
 }
@@ -947,6 +961,7 @@ li.literal + li.literal {
     display: flex;
     flex-direction: column;
     padding: 20px;
+    gap: 20px;
     border-radius: 10px;
     box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, .1);
     background-color: #0f3a3b;
@@ -959,9 +974,9 @@ li.literal + li.literal {
     display: flex;
     width: fit-content;
     max-width: 800px;
-    min-height: 400px;
-    height: fit-content;
-    max-height: 800px;
+    height: 400px;
+    padding-right: 5px;
+    overflow-y: auto;
 }
 
 .game-list-column {
@@ -998,10 +1013,22 @@ li.literal + li.literal {
     border-bottom: 2px solid white;
 }
 
+.game-list-entry.highlighted {
+    background-color: #a62349;
+    border: 1px solid #a62349;
+}
+
 .foot-button-container {
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
     align-items: center;
+    gap: 20px;
+}
+
+.done-button-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
     gap: 20px;
 }

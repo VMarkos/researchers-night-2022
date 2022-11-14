@@ -53,20 +53,25 @@ function initPattern() {
 }
 
 function addPattern() {
+    const doneButton = document.getElementById("advice-done-button");
+    doneButton.classList.remove("hidden");
+    doneButton.addEventListener("click", () => {
+        console.log("works?");
+        doneWithPattern();
+        doneButton.classList.add("hidden");
+    }, false);
     initPattern();
-    // const addButton = document.getElementById("add-button");
-    // addButton.innerText = "Done!";
-    // addButton.onclick = doneWithPattern;
     const blocker = document.createElement("div");
     blocker.classList.add("blocker");
     blocker.id = "blocker";
-    const bodyContainer  = document.getElementById("body-container");
-    bodyContainer.append(blocker);
+    // const bodyContainer = document.getElementById("body-container");
+    document.body.append(blocker);
     addPatternCells();
-    console.log(EXPLANATION);
-    if (EXPLANATION["flipped"] && !alreadyFlipped) {
-        flipPieces(EXPLANATION["flipped"]);
-    }
+    // event.currentTarget.style.zIndex = 1000;
+    // console.log(EXPLANATION);
+    // if (EXPLANATION["flipped"] && !alreadyFlipped) {
+    //     flipPieces(EXPLANATION["flipped"]);
+    // }
 }
 
 function highlightCell(event) {
@@ -225,10 +230,10 @@ function transpileToFn(pattern, ruleName) {
             z = 0;
         }
         ruleTransforms.push((a, b) => {return [x + a, y + b];});
-        if (RULE_MAP_JSON[CURRENT_PLAYER][ruleName]) {
-            RULE_MAP_JSON[CURRENT_PLAYER][ruleName].push([x, y, z]);
+        if (RULE_MAP_JSON[1 - CURRENT_PLAYER][ruleName]) {
+            RULE_MAP_JSON[1 - CURRENT_PLAYER][ruleName].push([x, y, z]);
         } else {
-            RULE_MAP_JSON[CURRENT_PLAYER][ruleName] = [[x, y, z]];
+            RULE_MAP_JSON[1 - CURRENT_PLAYER][ruleName] = [[x, y, z]];
         }
     }
     return ruleTransforms;
@@ -238,14 +243,18 @@ function updatePolicy() {
     let ruleString, policyString = "", ruleStrings = [];
     for (const pattern of basePatterns) {
         ruleString = transpileToRule(pattern);
+        // console.log(N_RULES);
         if (!ruleStrings.includes(ruleString)) {
             policyString += "R" + N_RULES[CURRENT_PLAYER] + ruleString + "\n";
             RULE_MAP.set("R" + N_RULES[CURRENT_PLAYER], transpileToFn(pattern, "R" + N_RULES[CURRENT_PLAYER]));
             ruleStrings.push(ruleString);
             N_RULES[CURRENT_PLAYER]++;
+            // RULE_MAP_JSON[CURRENT_PLAYER]["R" + N_RULES[CURRENT_PLAYER]] = pattern.body;
+            console.log(N_RULES, RULE_MAP_JSON);
         }
     }
-    coachedPolicyStrings += policyString;
+    console.log("pupdate:", RULE_MAP);
+    coachedPolicyStrings[CURRENT_PLAYER] += policyString;
 }
 
 function removeHighlights() {
@@ -301,7 +310,6 @@ function loadRuleMap() {
         rulePoints = RULE_MAP_JSON[CURRENT_PLAYER][rule];
         ruleTransforms = [];
         for (const point of rulePoints) {
-            // console.log(point);
             ruleTransforms.push((a, b) => {
                 if (point[2] === 1) {
                     return [point[0], point[1]];
@@ -313,18 +321,20 @@ function loadRuleMap() {
     }
 }
 
-function downloadPolicy() {
-    const policyJSON = preparePolicyForDownload(); // TODO Redefine this function for a single policy!
+function downloadPolicy(player) {
+    const policyJSON = preparePolicyForDownload(player); // TODO Redefine this function for a single policy!
     download(policyJSON["id"] + ".json", JSON.stringify(policyJSON, null, 2));
 }
 
 function preparePolicyForDownload(player) {
+    console.log(player, coachedPolicyStrings);
     const policyJSON = {
-        id: `${coachedPolicyStrings[player] === "" ? POLICIES[player]["id"] : "p" + Date.now()}`,
+        id: `${coachedPolicyStrings[player] === "" ? POLICIES[1 - player]["id"] : "p" + Date.now()}`,
         nRules: N_RULES[player],
-        policy: `${POLICIES[player]["text"][0] === "@" ? "" : "@Knowledge"}${POLICIES[player]["text"] ? POLICIES[player]["text"] : ""}\n${coachedPolicyStrings[player]}`,
-        ruleMap: RULE_MAP_JSON[player],
+        policy: `${POLICIES[1 - player]["text"][0] === "@" ? "" : "@Knowledge"}${POLICIES[1 - player]["text"] ? POLICIES[1 - player]["text"] : ""}\n${coachedPolicyStrings[player]}`,
+        ruleMap: RULE_MAP_JSON[1 - player],
     };
+    console.log(policyJSON.policy);
     return policyJSON;
 }
 
@@ -338,20 +348,21 @@ function download(filename, content) {
     document.body.removeChild(element);
 }
 
-function preparePoliciesForDownload() {
-    const policyJSON = {
-        policiesIds: [POLICIES[0]["id"], POLICIES[1]["id"]],
-        nRules: N_RULES,
-        policies: [
-            `${POLICIES[0]["text"][0] === "@" ? "" : "@Knowledge"}${POLICIES[0]["text"] ? POLICIES[0]["text"] : ""}\n${coachedPolicyStrings[0]}`,
-            `${POLICIES[1]["text"][0] === "@" ? "" : "@Knowledge"}${POLICIES[1]["text"] ? POLICIES[1]["text"] : ""}\n${coachedPolicyStrings[1]}`,
-        ],
-        ruleMap: RULE_MAP_JSON,
-    };
-    return policyJSON;
-}
+// function preparePoliciesForDownload() {
+//     const policyJSON = {
+//         policiesIds: [POLICIES[0]["id"], POLICIES[1]["id"]],
+//         nRules: N_RULES,
+//         policies: [
+//             `${POLICIES[0]["text"][0] === "@" ? "" : "@Knowledge"}${POLICIES[0]["text"] ? POLICIES[0]["text"] : ""}\n${coachedPolicyStrings[0]}`,
+//             `${POLICIES[1]["text"][0] === "@" ? "" : "@Knowledge"}${POLICIES[1]["text"] ? POLICIES[1]["text"] : ""}\n${coachedPolicyStrings[1]}`,
+//         ],
+//         ruleMap: RULE_MAP_JSON,
+//     };
+//     return policyJSON;
+// }
 
 function existsValidPattern() {
+    console.log("exists valid pattern?");
     let containsHead = false, containsBody = false;
     for (let i = -1; i < N_ROWS + 1; i++) {
         for (let j = -1; j < N_COLS + 1; j++) {
@@ -371,16 +382,18 @@ function existsValidPattern() {
 function doneWithPattern() {
     removePatternCells();
     removeHighlights();
-    if (EXPLANATION["flipped"] && !alreadyFlipped) {
-        flipPieces(EXPLANATION["flipped"]);
-    }
+    // if (EXPLANATION["flipped"] && !alreadyFlipped) {
+    //     flipPieces(EXPLANATION["flipped"]);
+    // }
     if (existsValidPattern()) {
+        console.log("EXISTS!");
         computeBasePatterns();
+        console.log("basePatterns:", basePatterns);
         updatePolicy();
     }
-    const addButton = document.getElementById("add-button");
-    addButton.innerText = "Offer Advice";
-    addButton.onclick = addPattern;
+    // const addButton = document.getElementById("add-button");
+    // addButton.innerText = "Offer Advice";
+    // addButton.onclick = addPattern;
     document.getElementById("blocker").remove();
     if (document.getElementById("rightClickMenu")) {
         closeRightClickMenu();
