@@ -56,7 +56,7 @@ function addPattern() {
     const doneButton = document.getElementById("advice-done-button");
     doneButton.classList.remove("hidden");
     doneButton.addEventListener("click", () => {
-        console.log("works?");
+        // console.log("works?");
         doneWithPattern();
         doneButton.classList.add("hidden");
     }, false);
@@ -390,6 +390,7 @@ function doneWithPattern() {
         computeBasePatterns();
         console.log("basePatterns:", basePatterns);
         updatePolicy();
+        savedSession = false;
     }
     // const addButton = document.getElementById("add-button");
     // addButton.innerText = "Offer Advice";
