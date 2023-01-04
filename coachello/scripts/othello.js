@@ -27,6 +27,8 @@ let BULK_GAMES_CURRENT = 0;
 let BULK_GAMES = [];
 let CURRENT_PLAYER = 1; // 0 = white, 1 = black;
 
+const colTags = ["Date", "Black", "White", "Score", "Winner", "Black Policy", "White Policy"];
+
 const TIMEOUT_IDS = [];
 
 const SCORE = [2, 2];
@@ -41,6 +43,7 @@ let CURRENT_GAME = [];
 let currentMove;
 let canMoveForward = false, canMoveBackward = false;
 let highlightedCell = "";
+let fromPending = false;
 
 const highlightEvent = new Event("highlight");
 
@@ -584,7 +587,10 @@ function prudensAutoplay(color) {
     });
 }
 
-function previousMove(casualCall = true) {
+function previousMove(casualCall = true, skipPending = false) {
+    if (!PAUSED) {
+        pauseGame();
+    }
     if (!canMoveForward) {
         canMoveForward = true;
         const stepForward = document.getElementById("step-forward");
@@ -597,17 +603,29 @@ function previousMove(casualCall = true) {
         playPause.classList.remove("inactive");
         playPause.addEventListener("click", autoplay, false);
     }
+    if (!skipPending && !fromPending && currentMove !== 0) {
+        fromPending = true;
+        goToPendingMove(currentMove);
+        return true;
+    }
+    if (casualCall) {
+        disableAdviseButton();
+    }
+    fromPending = false;
     const lastDot = document.getElementById("last-dot");
-    if (lastDot && casualCall) {
+    // console.log("608:", lastDot, highlightedCell);
+    if (lastDot && casualCall && highlightedCell !== "") {
         lastDot.id = "";
         lastDot.classList.remove("fa-dot-circle-o");
         lastDot.classList.add("fa-circle-o");
         document.getElementById(highlightedCell).classList.remove("highlighted");
-        highlightedCell = ""
+        highlightedCell = "";
     }
     currentMove--;
     removeExplanationBorders();
-    updateMoveSpan();
+    if (casualCall) {
+        updateMoveSpan(1);
+    }
     let prevMove, row, col, color;
     const thisMove = CURRENT_GAME[currentMove];
     if (TEMP_BOARD === undefined) {
@@ -682,11 +700,14 @@ function countStones(board) {
     return [blacks, whites];
 }
 
-function backwardFast(existsPreviousMove = true, moveCount = 65, cell = undefined, casualCall = true) {
+function backwardFast(existsPreviousMove = true, moveCount = CURRENT_GAME.length * 2, cell = undefined, casualCall = true, skipPending = false) {
+    if (!PAUSED) {
+        pauseGame();
+    }
     if (existsPreviousMove && moveCount > 0) {
-        existsPreviousMove = previousMove(casualCall);
+        existsPreviousMove = previousMove(casualCall, skipPending);
         moveCount--
-        setTimeout(() => {backwardFast(existsPreviousMove, moveCount, cell, casualCall);}, 50);
+        setTimeout(() => {backwardFast(existsPreviousMove, moveCount, cell, casualCall, skipPending);}, 50);
     }
     if (!existsPreviousMove) {
         const fastBackward = document.getElementById("fast-backward");
@@ -697,7 +718,33 @@ function backwardFast(existsPreviousMove = true, moveCount = 65, cell = undefine
     }
 }
 
-function nextMove(casualCall = true) {
+function disableAdviseButton() {
+    console.log("disable");
+    const adviseButton = document.getElementById("advise-button");
+    if (adviseButton.classList.contains("inactive")) {
+        return;
+    }
+    adviseButton.classList.add("inactive");
+    adviseButton.removeEventListener("click", addPattern, false);
+}
+
+function enableAdviseButton() {
+    const adviseButton = document.getElementById("advise-button");
+    console.log(adviseButton);
+    if (!adviseButton.classList.contains("inactive")) {
+        console.log("return");
+        return;
+    }
+    adviseButton.classList.remove("inactive");
+    console.log(adviseButton.classList);
+    adviseButton.addEventListener("click", addPattern, false);
+    console.log("added Event Listener");
+}
+
+function nextMove(casualCall = true, skipPending = false) {
+    if (!PAUSED) {
+        pauseGame();
+    }
     if (!canMoveBackward) {
         canMoveBackward = true;
         const stepBackward = document.getElementById("step-backward");
@@ -707,8 +754,17 @@ function nextMove(casualCall = true) {
         fastBackward.classList.remove("inactive");
         fastBackward.addEventListener("click", backwardFast, false);
     }
+    if (!skipPending && !fromPending && currentMove + 1 !== CURRENT_GAME.length) {
+        fromPending = true;
+        goToPendingMove(currentMove + 1);
+        return true;
+    }
+    if (casualCall) {
+        disableAdviseButton();
+    }
+    fromPending = false;
     const lastDot = document.getElementById("last-dot");
-    if (lastDot && casualCall) {
+    if (lastDot && casualCall && highlightedCell !== "") {
         lastDot.id = "";
         lastDot.classList.remove("fa-dot-circle-o");
         lastDot.classList.add("fa-circle-o");
@@ -717,8 +773,10 @@ function nextMove(casualCall = true) {
     }
     removeExplanationBorders();
     currentMove++;
-    // console.log(currentMove);
-    updateMoveSpan();
+    // console.log("updateMoveSpan");
+    if (casualCall) {
+        updateMoveSpan(-1);
+    }
     let prevMove, row, col, color;
     prevMove = CURRENT_GAME[currentMove - 1];
     row = prevMove["cell"][0];
@@ -726,16 +784,13 @@ function nextMove(casualCall = true) {
     color = prevMove["color"];
     LEGAL_MOVES = prevMove["legalMoves"];
     let value;
-    // console.log("here");
     eraseLegalMoves();
     if (currentMove === CURRENT_GAME.length) {
         canMoveForward = false;
         BOARD = TEMP_BOARD;
         TEMP_BOARD = undefined;
         drawBoard(BOARD);
-        // updateScore(color, ...countStones(BOARD));
         drawLegalMoves((-1) * color);
-        // console.log("LM:", LEGAL_MOVES);
         const fastForward = document.getElementById("fast-forward");
         fastForward.classList.add("inactive");
         fastForward.removeEventListener("click", forwardFast, false);
@@ -752,11 +807,7 @@ function nextMove(casualCall = true) {
         LEGAL_MOVES = thisMove["legalMoves"];
         drawBoard(thisMove["board"]);
         drawLegalMoves(color, false, thisMove["legalMoves"]);
-        // if (prevMove["explanation"] === {}) {
         EXPLANATION = prevMove["explanation"];
-        // console.log(EXPLANATION);
-        // explain();
-        // }
         value = true;
     }
     if (row > -1 && col > -1) {
@@ -774,13 +825,17 @@ function nextMove(casualCall = true) {
     return value;
 }
 
-function forwardFast(existsNextMove = true, moveCount = 65, cell = undefined, casualCall = true) {
+function forwardFast(existsNextMove = true, moveCount = CURRENT_GAME.length * 2, cell = undefined, casualCall = true, skipPending = false) {
+    if (!PAUSED) {
+        pauseGame();
+    }
     if (existsNextMove && moveCount > 0) {
-        existsNextMove = nextMove(casualCall);
+        existsNextMove = nextMove(casualCall, skipPending);
         moveCount--;
-        setTimeout(() => {forwardFast(existsNextMove, moveCount, cell, casualCall);}, 50);
+        setTimeout(() => {forwardFast(existsNextMove, moveCount, cell, casualCall, skipPending);}, 50);
     }
     if (!existsNextMove) {
+        // console.log("in remove:", moveCount);
         const fastForward = document.getElementById("fast-forward");
         fastForward.removeEventListener("click", forwardFast, false);
     }
@@ -789,27 +844,17 @@ function forwardFast(existsNextMove = true, moveCount = 65, cell = undefined, ca
     }
 }
 
-function updateMoveSpan(moveCols = 2) {
-    let index;
-    if (currentMove === 0) {
-        index = 0;
-    } else if (currentMove % moveCols === 1) {
-        index = Math.floor(CURRENT_GAME.length / moveCols) + Math.floor(currentMove / moveCols);
-    } else {
-        index = Math.floor(3 * CURRENT_GAME.length / moveCols) + Math.floor(currentMove / moveCols) - 1;
-    }
-    const previousSpan = document.getElementById("last-move-span");
-    // let currentMoveNumber = currentMove;
+function updateMoveSpan(step) {
+    const previousSpan = document.getElementById(`${fromPending && step === -1 ? "pending" : "actual"}-${currentMove + step}`);
     if (previousSpan) {
         previousSpan.classList.remove("last-move-span");
-        previousSpan.id = "";
-        // currentMoveNumber = parseInt(previousSpan.getAttribute("data-move-number"));
     }
     if (currentMove !== 0) {
-        const targetSpan = document.getElementsByClassName("move-span")[index];
+        const targetSpan = document.getElementById(`${fromPending && step === -1 ? "pending" : "actual"}-${currentMove}`);
         targetSpan.classList.add("last-move-span");
-        targetSpan.id = "last-move-span";
-        targetSpan.scrollIntoView();
+        if (!utils.frontEnd.intoView(targetSpan, document.getElementById("moves"))) {
+            utils.frontEnd.scrollTo(document.getElementById("moves"), -step * 0.7);
+        }
     }
 }
 
@@ -818,6 +863,7 @@ function appendMoveToGameHistory(row, col, color) {
     const pendingMoveContainer = document.getElementById(`pending-${color === 1 ? "white" : "black"}-moves`);
     const pendingMove = document.createElement("span");
     pendingMove.classList.add("move-span");
+    pendingMove.id = "pending-" + currentMove;
     pendingMove.setAttribute("data-move-number", "" + currentMove);
     if (MODE === 0) {
         pendingMove.classList.add("inactive");
@@ -843,13 +889,15 @@ function appendMoveToGameHistory(row, col, color) {
     } else {
         moveSpan.addEventListener("click", goToMove, false);
     }
-    const previousSpan = document.getElementById("last-move-span");
+    const previousSpan = document.getElementsByClassName("last-move-span")[0];
     if (previousSpan) {
         previousSpan.classList.remove("last-move-span");
-        previousSpan.id = "";
+        // previousSpan.id = "";
     }
-    moveSpan.id = "last-move-span";
-    moveSpan.classList.add("last-move-span");
+    moveSpan.id = "actual-" + currentMove;
+    if (MODE === 0) {
+        moveSpan.classList.add("last-move-span");
+    }
     moveSpan.innerText = moveString;
     moveSpan.setAttribute("data-move-number", "" + currentMove);
     moveContainer.append(moveSpan);
@@ -864,18 +912,27 @@ function appendMoveToGameHistory(row, col, color) {
 }
 
 function goToPendingMove(event) {
+    enableAdviseButton();
+    let targetSpan, prevMoveSpan;
+    if (typeof event === "number") {
+        targetSpan = document.getElementById("pending-" + event);
+        prevMoveSpan = document.getElementById("actual-" + (event - 1));
+    } else {
+        targetSpan = event.currentTarget;
+        prevMoveSpan = document.getElementsByClassName("last-move-span")[0];
+    }
+    if (targetSpan && prevMoveSpan) {
+        const step = Math.sign(parseInt(targetSpan.id.split("-")[1]) - parseInt(prevMoveSpan.id.split("-")[1]));
+        if (!utils.frontEnd.intoView(targetSpan, document.getElementById("moves"))) {
+            utils.frontEnd.scrollTo(document.getElementById("moves"), step * 0.7);
+        }
+    }
     if (highlightedCell) {
         document.getElementById(highlightedCell).classList.remove("highlighted");
-        // const toBeUnflipped = document.getElementsByClassName("flip-highlighted"); // FIXME You are fixing this.
-        // for (const cell of toBeUnflipped) {
-        //     cell.classList.remove("flip-highlighted");
-        // }
     }
-    // const adviseButton = document.getElementById("advise-button");
-    // adviseButton.classList.remove("inactive");
-    // document.getElementById("advise-blocker").remove();
-    const targetSpan = event.currentTarget;
-    // console.log(targetSpan);
+    if (prevMoveSpan) {
+        prevMoveSpan.classList.remove("last-move-span");
+    }
     const emptyDot = targetSpan.firstChild;
     const lastDot = document.getElementById("last-dot");
     if (lastDot) {
@@ -888,7 +945,16 @@ function goToPendingMove(event) {
     emptyDot.classList.add("fa-dot-circle-o");
     const moveNumber = parseInt(targetSpan.getAttribute("data-move-number"));
     let currentMoveNumber = currentMove;
+    // console.log("oc-" + CURRENT_GAME[moveNumber - 1]["cell"].join("-"));
+    if (CURRENT_GAME[moveNumber - 1]["cell"][0] < 0 || CURRENT_GAME[moveNumber - 1]["cell"][1] < 0) {
+        return;
+    }
     const cell = document.getElementById("oc-" + CURRENT_GAME[moveNumber - 1]["cell"].join("-"));
+    // console.log("cell:", cell);
+    // TODO Check this again!
+    cell.classList.add("highlighted");
+    highlightedCell = cell.id;
+    // Until here
     cell.addEventListener("highlight", (event) => {
         const toBeFlipped = CURRENT_GAME[moveNumber - 1]["toBeFlipped"]["oc-" + CURRENT_GAME[moveNumber - 1]["cell"].join("-")];
         highlightPendingCell(event, toBeFlipped);
@@ -897,11 +963,12 @@ function goToPendingMove(event) {
     }, false);
     removeLastDot = false;
     if (moveNumber < currentMoveNumber) {
-        backwardFast(true, currentMoveNumber - moveNumber + 1, cell, false);
+        // console.log("BF here");
+        backwardFast(true, (currentMoveNumber - moveNumber + 1), cell, false, true);
     } else if (moveNumber > currentMoveNumber) {
-        forwardFast(true, moveNumber - currentMoveNumber - 1, cell, false);
+        // console.log("FF here", moveNumber, currentMoveNumber);
+        forwardFast(true, (moveNumber - currentMoveNumber - 1), cell, false, true);
     }
-    // explain();
 }
 
 function highlightPendingCell(event, toBeFlipped) {
@@ -921,9 +988,9 @@ function goToMove(event) {
     // addBlocker(adviseButton, {id: "advise-blocker"});
     let currentMoveNumber = currentMove;
     if (moveNumber < currentMoveNumber) {
-        backwardFast(true, currentMoveNumber - moveNumber);
+        backwardFast(true, (currentMoveNumber - moveNumber), undefined, true, true);
     } else if (moveNumber > currentMoveNumber) {
-        forwardFast(true, moveNumber - currentMoveNumber);
+        forwardFast(true, (moveNumber - currentMoveNumber), undefined, true, true);
     }
 }
 
@@ -1214,7 +1281,7 @@ function setupMode() {
 }
 
 function prepareGameforDownload() {
-    let gameId = `${BLACK === 0 ? "h" : "p"}${WHITE === 0 ? "h" : "p"}_${SCORE[0]}_${SCORE[1]}_${Date.now()}`; // TODO Maybe add policy id?
+    let gameId = `${BLACK === 0 ? "h" : "p"}${WHITE === 0 ? "h" : "p"}_${SCORE[0]}_${SCORE[1]}_${Date.now()}`;
     return {
         gameId: gameId,
         game: CURRENT_GAME,
@@ -1297,13 +1364,11 @@ function loadGameHistory() {
     const board = document.getElementById("board-container");
     board.innerHTML = "";
     coachedPolicyString = "";
-    // currentMove = undefined;
     initializeBoard(false);
     drawLegalMoves(-1, true, ["oc-2-3", "oc-3-2", "oc-4-5", "oc-5-4"]);
-    const previousSpan = document.getElementById("last-move-span");
+    const previousSpan = document.getElementsByClassName("last-move-span")[0];
     if (previousSpan) {
         previousSpan.classList.remove("last-move-span");
-        previousSpan.id = "";
     }
     canMoveForward = true;
     currentMove = 0;
@@ -1316,6 +1381,7 @@ function loadGameHistory() {
     const playPause = document.getElementById("play-pause");
     playPause.classList.remove("inactive");
     playPause.addEventListener("click", autoplay, false);
+    document.getElementById("moves").scrollTo(0, 0);
 }
 
 function autoplay(existsMove = true, firstPress = true) {
@@ -1346,7 +1412,6 @@ function autoplay(existsMove = true, firstPress = true) {
         playPause.append(play);
         if (PAUSED) {
             PAUSED = false;
-            // console.log("Paused:", PAUSED);
             playPause.removeEventListener("click", pauseGame, false);
             playPause.addEventListener("click", autoplay, false);
         }
@@ -1363,8 +1428,8 @@ function stringToId(string) {
 }
 
 function loadGame(gameJSON, filename) {
-    if (filename.substring(0, 4) === "bulk") {
-        loadGameList(gameJSON, filename);
+    if (gameJSON["bulkId"] && gameJSON["bulkId"].substring(0, 4) === "bulk") {
+        loadGameList(gameJSON["bulk"], filename);
     } else {
         loadSingleGame(gameJSON, filename);
     }
@@ -1378,7 +1443,6 @@ function loadGameList(gameJSON, filename) {
     const glContainer = document.createElement("div");
     glContainer.classList.add("game-list-container");
     let game, gameId, splitId;
-    const colTags = ["Date", "Black", "White", "Result", "Score", "Black Policy", "White Policy"];
     let col, tag, header, entry, bs, ws, tooltip;
     const cols = [];
     for (let i = 0; i < colTags.length; i++) {
@@ -1416,15 +1480,15 @@ function loadGameList(gameJSON, filename) {
             } else if (j === 1 || j === 2) {
                 entry.append(`${gameId[j - 1] === "h" ? "Human" : "Prudens"}`);
             } else if (j === 3) {
-                if (bs > ws) {
-                    entry.innerText = "Black won";
-                } else if (bs === ws) {
-                    entry.innerText = "Draw";
-                } else {
-                    entry.innerText = "White won";
-                }
-            } else if (j === 4) {
                 entry.innerText = bs + "-" + ws;
+            } else if (j === 4) {
+                if (bs > ws) {
+                    entry.innerText = "Black";
+                } else if (bs === ws) {
+                    entry.innerText = "Tie";
+                } else {
+                    entry.innerText = "White";
+                }
             } else if (j === 5 || j === 6) {
                 tooltip = game["policies"][6 - j]["id"] ? game["policies"][6 - j]["id"] : "random";
                 entry.innerText = `${gameId[j - 5] === "h" ? "(default)" : shortenString(tooltip, 16, 4)}`;
@@ -1493,7 +1557,6 @@ function loadGameList(gameJSON, filename) {
 }
 
 function highlightEntry(event) {
-    const colTags = ["Date", "Black", "White", "Result", "Score", "Black Policy", "White Policy"];
     const entry = event.currentTarget;
     const sid = entry.id.split("-");
     const index = parseInt(sid[sid.length - 1]);
@@ -1503,7 +1566,6 @@ function highlightEntry(event) {
 }
 
 function unhighlightEntry(event) {
-    const colTags = ["Date", "Black", "White", "Result", "Score", "Black Policy", "White Policy"];
     const entry = event.currentTarget;
     const sid = entry.id.split("-");
     const index = parseInt(sid[sid.length - 1]);
@@ -1651,7 +1713,7 @@ function removeCM(event) {
         isAudit = event.target.id[0] === "a";
         event.target.removeEventListener("click", isAudit ? enterAuditMode : enterPlayMode, false);
         event.target.style.zIndex = 3;
-        console.log("button press");
+        // console.log("button press");
         if (MODE === 1 && event.target.id[0] === "p") {
             MODE = 0;
             resetGame();
@@ -1665,6 +1727,7 @@ function removeCM(event) {
             resetAudit();
         } else if (MODE === 0 && isAudit) {
             MODE = 1;
+            resetGame();
             const gameContainer = document.getElementById("play-game-container");
             gameContainer.style.top = "-100vh";
             setTimeout(() => {
@@ -1747,6 +1810,7 @@ function resetGame() {
     SCORE[0] = 2;
     SCORE[1] = 2;
     resetGameHistory();
+    // console.log("here");
     initializeBoard();
 }
 
@@ -1799,10 +1863,8 @@ function finalizeSettings() { // TODO Add event so as to track whether settings 
 }
 
 function updateSettings() {
-    // console.log("update settings");
     if (WHITE === 1) {
         WHITE_TIMEOUT = parseInt(document.getElementById("white-timeout-input").value);
-        // console.log("In:", WHITE_TIMEOUT);
     }
     if (BLACK === 1) {
         BLACK_TIMEOUT = parseInt(document.getElementById("black-timeout-input").value);
@@ -1813,15 +1875,19 @@ function updateSettings() {
             prudensMove(-1);
         }
     } else if (BLACK === 1 && WHITE === 1) {
-        // console.log("pvp");
+        BULK_GAMES_NUM = parseInt(document.getElementById("games-num").value);
         if (!ANIMATED) {
             WHITE_TIMEOUT = 0;
             BLACK_TIMEOUT = 0;
             showGameProgress();
         }
-        BULK_GAMES_NUM = parseInt(document.getElementById("games-num").value);
         gameLoop(-1, 0);
     }
+}
+
+function updateProgressCount() {
+    const progressCount = document.getElementById("progress-count");
+    progressCount.innerText = BULK_GAMES_CURRENT + " / " + BULK_GAMES_NUM;
 }
 
 function gameLoop(color, i) {
@@ -1829,7 +1895,10 @@ function gameLoop(color, i) {
         BULK_GAMES_CURRENT = i;
         if (i >= BULK_GAMES_NUM) {
             const bulkId = `bulk${WHITE === 0 ? "h" : "p"}${BLACK === 0 ? "h" : "p"}${BULK_GAMES_NUM}_${Date.now()}`;
-            download(bulkId + ".json", JSON.stringify(BULK_GAMES));
+            download(bulkId + ".json", JSON.stringify({
+                bulkId: bulkId,
+                bulk: BULK_GAMES,
+            }));
             const doneButton = document.getElementById("done-button");
             doneButton.removeEventListener("click", resetSettings, false);
             doneButton.addEventListener("click", finalizeSettings, false);
@@ -1846,6 +1915,7 @@ function gameLoop(color, i) {
             BULK_GAMES.push(prepareGameforDownload());
             gameOverCounter = 0;
             resetGame();
+            updateProgressCount();
             resolve(true);
             return;
         }
@@ -1867,11 +1937,19 @@ function showGameProgress() {
     document.body.append(blocker);
     const pbContainer = document.createElement("div");
     pbContainer.classList.add("progress-bar-container");
+    const progressCount = document.createElement("div");
+    progressCount.classList.add("progress-count");
+    progressCount.innerText = "0 / " + BULK_GAMES_NUM;
+    progressCount.id = "progress-count";
     const progressBar = document.createElement("div");
     progressBar.classList.add("progress-bar");
     progressBar.id = "progress-bar";
     pbContainer.append(progressBar);
-    blocker.append(pbContainer);
+    const progressContainer = document.createElement("div");
+    progressContainer.classList.add("progress-container");
+    progressContainer.append(progressCount);
+    progressContainer.append(pbContainer)
+    blocker.append(progressContainer);
     updateProgressBar();
 }
 
@@ -1948,7 +2026,7 @@ function showPlayModeSettings() {
     const gamesNumInput = document.createElement("input");
     gamesNumContainer.classList.add("games-number-container");
     gamesNumLabel.for = "games-num";
-    gamesNumLabel.append(document.createTextNode("Games:"));
+    gamesNumLabel.append(document.createTextNode("# Games:"));
     gamesNumInput.type = "text";
     gamesNumInput.id = "games-num";
     gamesNumInput.name = "games-num";
@@ -1999,7 +2077,7 @@ function getSaveGameButton() {
     const button = document.createElement("div");
     button.classList.add("game-load-container", "inactive");
     // button.addEventListener("click", downloadGame, false);
-    button.append(document.createTextNode("Save "));
+    button.append(document.createTextNode("Save Game "));
     button.id = "save-game-button";
     const icon = document.createElement("i");
     icon.classList.add("fa");
@@ -2311,7 +2389,9 @@ function enterAuditMode(event) {
             showCM(event);
         } else {
             MODE = 1;
-            // resetAudit();
+            // console.log("init?");
+            resetGame();
+            // initializeBoard();
             const gameContainer = document.getElementById("play-game-container");
             gameContainer.style.top = "-100vh";
             setTimeout(() => {
@@ -2339,7 +2419,9 @@ function resetAudit() {
         document.getElementById(color + "-policy-button").innerText = "??";
         downBtn = document.getElementById(color + "-download-policy");
         downBtn.classList.add("inactive");
-        const dump = addBlocker(downBtn, {id: color + "-download-policy-blocker"});
+        if (!document.getElementById(color + "-download-policy-blocker")) {
+            const dump = addBlocker(downBtn, {id: color + "-download-policy-blocker"});
+        }
     }
     document.getElementById("game-date").innerHTML = "??";
     const board = document.getElementById("board-container");
@@ -2395,6 +2477,12 @@ function getAuditSettings() {
     const gameUploadInput = document.createElement("input");
     gameUploadInput.type = "file";
     gameUploadButton.addEventListener("click", () => {gameUploadInput.click();}, false);
+    document.addEventListener("keydown", (event) => {
+        if (event.ctrlKey && event.key === "o") {
+            event.preventDefault();
+            gameUploadInput.click();
+        }
+    }, false);
     gameUploadInput.addEventListener("change", function() {
         const reader = new FileReader();
         reader.onload = (() => {
@@ -2532,8 +2620,22 @@ function getGameHeader() {
 
 function main() {
     initializeBoard();
-    document.getElementById("play-button").addEventListener("click", enterPlayMode, false);
-    document.getElementById("audit-button").addEventListener("click", enterAuditMode, false);
+    const playButton = document.getElementById("play-button")
+    playButton.addEventListener("click", enterPlayMode, false);
+    document.addEventListener("keydown", (event) => {
+        if (event.ctrlKey && event.altKey && event.key === "p") {
+            event.preventDefault();
+            playButton.click();
+        }
+    }, false);
+    const auditButton = document.getElementById("audit-button")
+    auditButton.addEventListener("click", enterAuditMode, false);
+    document.addEventListener("keydown", (event) => {
+        if (event.ctrlKey && event.altKey && event.key === "a") {
+            event.preventDefault();
+            auditButton.click();
+        }
+    }, false);
 }
 
 window.addEventListener("load", main);

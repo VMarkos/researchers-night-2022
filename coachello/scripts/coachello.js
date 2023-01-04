@@ -53,25 +53,37 @@ function initPattern() {
 }
 
 function addPattern() {
-    const doneButton = document.getElementById("advice-done-button");
-    doneButton.classList.remove("hidden");
+    const rightContainer = document.getElementById("right-menu-container");
+    const patternAreaContainer = document.createElement("div");
+    patternAreaContainer.classList.add("pattern-area-container");
+    const patternArea = document.createElement("div");
+    patternArea.classList.add("pattern-area");
+    const doneButtonContainer = document.createElement("div");
+    doneButtonContainer.classList.add("done-button-container");
+    const doneButton = document.createElement("div");
+    doneButton.classList.add("init-button", "play");
+    doneButton.innerText = "Done";
     doneButton.addEventListener("click", () => {
-        // console.log("works?");
         doneWithPattern();
-        doneButton.classList.add("hidden");
     }, false);
+    const cancelButton = document.createElement("div");
+    cancelButton.classList.add("init-button", "cancel");
+    cancelButton.innerText = "Cancel";
+    cancelButton.addEventListener("click", () => {
+        patternAreaContainer.remove();
+        document.getElementById("blocker").remove();
+    }, false);
+    doneButtonContainer.append(cancelButton);
+    doneButtonContainer.append(doneButton);
+    patternArea.append(doneButtonContainer);
+    patternAreaContainer.append(patternArea);
+    rightContainer.append(patternAreaContainer);
     initPattern();
     const blocker = document.createElement("div");
-    blocker.classList.add("blocker");
+    blocker.classList.add("blocker", "blurry");
     blocker.id = "blocker";
-    // const bodyContainer = document.getElementById("body-container");
     document.body.append(blocker);
     addPatternCells();
-    // event.currentTarget.style.zIndex = 1000;
-    // console.log(EXPLANATION);
-    // if (EXPLANATION["flipped"] && !alreadyFlipped) {
-    //     flipPieces(EXPLANATION["flipped"]);
-    // }
 }
 
 function highlightCell(event) {

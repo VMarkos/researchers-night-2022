@@ -715,6 +715,7 @@ li.literal + li.literal {
     width: 200px;
     height: 260px;
     overflow-y: auto;
+    scroll-behavior: smooth;
 }
 
 .move-number-container.audit {
@@ -1023,6 +1024,7 @@ li.literal + li.literal {
 
 .progress-bar-container {
     display: flex;
+    gap: 40px;
     height: 6px;
     min-width: 600px;
     background-color: rgba(0, 0, 0, .3);
@@ -1035,6 +1037,20 @@ li.literal + li.literal {
     background-color: rgba(60, 164, 60, 1.0);
     border-radius: 3px;
     transition-duration: 1ms;
+}
+
+.progress-container {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    justify-content: center;
+    align-items: center;
+}
+
+.progress-count {
+    display: flex;
+    font-size: 24pt;
+    color: white;
 }
 
 /* Bulk upload */
@@ -1075,6 +1091,7 @@ li.literal + li.literal {
     display: flex;
     padding: 6px 0px 4px 0px;
     white-space: nowrap;
+    user-select: none;
 }
 
 .game-list-entry.pad-left {
@@ -1119,7 +1136,9 @@ li.literal + li.literal {
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
+    padding: 20px 20px 20px 20px;
     gap: 20px;
+    /* border: 1px solid blue; */
 }
 
 /* Change mode */
@@ -1129,4 +1148,29 @@ li.literal + li.literal {
     padding: 5px 0px 0px 0px;
     color: white;
     font-size: 9pt;
+}
+
+/* Pattern area */
+
+.pattern-area-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 10px 10px 10px;
+    z-index: 101;
+    /* border: 1px solid red; */
+}
+
+.pattern-area {
+    width: 100%;
+    height: 100%;
+    padding: 10px 10px 10px 10px;
+    border-radius: 5px;
+    background-color: #393e46;
+    box-shadow: 4px 4px 4px 0px rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
 }
