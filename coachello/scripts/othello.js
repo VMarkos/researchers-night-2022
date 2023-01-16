@@ -719,7 +719,7 @@ function backwardFast(existsPreviousMove = true, moveCount = CURRENT_GAME.length
 }
 
 function disableAdviseButton() {
-    console.log("disable");
+   // console.log("disable");
     const adviseButton = document.getElementById("advise-button");
     if (adviseButton.classList.contains("inactive")) {
         return;
@@ -730,15 +730,15 @@ function disableAdviseButton() {
 
 function enableAdviseButton() {
     const adviseButton = document.getElementById("advise-button");
-    console.log(adviseButton);
+   // console.log(adviseButton);
     if (!adviseButton.classList.contains("inactive")) {
-        console.log("return");
+       // console.log("return");
         return;
     }
     adviseButton.classList.remove("inactive");
-    console.log(adviseButton.classList);
+   // console.log(adviseButton.classList);
     adviseButton.addEventListener("click", addPattern, false);
-    console.log("added Event Listener");
+   // console.log("added Event Listener");
 }
 
 function nextMove(casualCall = true, skipPending = false) {
